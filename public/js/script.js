@@ -1,6 +1,7 @@
-import {toggle, playSong } from './player.js';
+import { activatePlayer, toggle, playSong } from './player.js';
 import { getAccessToken, showBlockingAuthMessage } from './auth.js';
 import { normalizeSpotifyId } from './spotifyInput.js';
+import { createTrackItem, createPlaylistTrackItem, appendUniqueTrack } from './spotifyTracks.js';
 
 var recent = [];
 
@@ -40,7 +41,18 @@ var limit = 20;
 var endpoint = '';
 
 var data = [];
-var index = -1; 
+var index = -1;
+
+function hasLoadedTracks() {
+    if(data.length > 0) {
+        return true;
+    }
+
+    document.getElementById('song').innerHTML = 'No playable tracks found';
+    localStorage.removeItem('uri');
+    localStorage.removeItem('song');
+    return false;
+} 
 
 var specificSong = false; 
 
@@ -71,12 +83,12 @@ function newSong() {
             .then((responseData) => {
                 const tracks = responseData.tracks.items;
                 tracks.forEach((track) => {
-                    const trackItem = { titel:track.name, artist:track.artists[0].name, uri:track.uri, duration:track.duration_ms };
-                    if(!data.some(trackItem2 => trackItem2.titel == trackItem.titel)) {
-                        data.push(trackItem);
-                    }
+                    appendUniqueTrack(data, createTrackItem(track));
                 });
-                
+                if(!hasLoadedTracks()) {
+                    return;
+                }
+
                 const lastItems = recent.length > probabilityLimit ? recent.slice(-probabilityLimit) : recent;
                 var k = whileMargin; 
 
@@ -118,10 +130,7 @@ function newSong() {
                                 const tracks = responseData2.items;
                                 const temp = JSON.parse(localStorage.getItem('tracks'));
                                 tracks.forEach((track) => {
-                                    const trackItem = { titel:track.name, artist:track.artists[0].name, uri:track.uri, duration:track.duration_ms };
-                                    if(!temp.some(trackItem2 => trackItem2.titel == trackItem.titel)) {
-                                        temp.push(trackItem);
-                                    }
+                                    appendUniqueTrack(temp, createTrackItem(track));
                                 });
                                 localStorage.setItem('tracks', JSON.stringify(temp));
                                 })
@@ -137,8 +146,11 @@ function newSong() {
                             tracks.forEach((track) => {
                             data.push(track);
                             });
+                if(!hasLoadedTracks()) {
+                    return;
+                }
 
-                            const lastItems = recent.length > probabilityLimit ? recent.slice(-probabilityLimit) : recent;
+                const lastItems = recent.length > probabilityLimit ? recent.slice(-probabilityLimit) : recent;
                             var k = whileMargin; 
 
                             do {
@@ -169,12 +181,12 @@ function newSong() {
             .then((responseData) => {
                 const tracks = responseData.items;
                 tracks.forEach((track) => {
-                    const trackItem = { titel:track.track.name, artist:track.track.artists[0].name, uri:track.track.uri, duration:track.track.duration_ms };
-                    if(!data.some(trackItem2 => trackItem2.titel == trackItem.titel)) {
-                        data.push(trackItem);
-                    }
+                    appendUniqueTrack(data, createPlaylistTrackItem(track));
                 });
-    
+                if(!hasLoadedTracks()) {
+                    return;
+                }
+
                 const lastItems = recent.length > probabilityLimit ? recent.slice(-probabilityLimit) : recent;
                 var k = whileMargin; 
 
@@ -202,13 +214,14 @@ function newSong() {
             .then((responseData) => {
                 const tracks = responseData.items;
                 tracks.forEach((track) => {
-                    const trackItem = { titel:track.name, artist:track.artists[0].name, uri:track.uri, duration:track.duration_ms };
-                    if(!data.some(trackItem2 => trackItem2.titel == trackItem.titel)) {
-                        data.push(trackItem);
-                    }
+                    appendUniqueTrack(data, createTrackItem(track));
                 });
                 
                 const albumProbabilityLimit = 3; 
+                if(!hasLoadedTracks()) {
+                    return;
+                }
+
                 const lastItems = recent.length > albumProbabilityLimit ? recent.slice(-albumProbabilityLimit) : recent;
                 var k = whileMargin; 
 
@@ -256,12 +269,12 @@ function newSong() {
             .then((responseData) => {
                 const tracks = responseData.items;
                 tracks.forEach((track) => {
-                    const trackItem = { titel:track.name, artist:track.artists[0].name, uri:track.uri, duration:track.duration_ms };
-                    if(!data.some(trackItem2 => trackItem2.titel == trackItem.titel)) {
-                        data.push(trackItem);
-                    }
+                    appendUniqueTrack(data, createTrackItem(track));
                 });
-    
+                if(!hasLoadedTracks()) {
+                    return;
+                }
+
                 const lastItems = recent.length > probabilityLimit ? recent.slice(-probabilityLimit) : recent;
                 var k = whileMargin; 
 
@@ -290,12 +303,12 @@ function newSong() {
             .then((responseData) => {
                 const tracks = responseData.items;
                 tracks.forEach((track) => {
-                    const trackItem = { titel:track.track.name, artist:track.track.artists[0].name, uri:track.track.uri, duration:track.track.duration_ms };
-                    if(!data.some(trackItem2 => trackItem2.titel == trackItem.titel)) {
-                        data.push(trackItem);
-                    }
+                    appendUniqueTrack(data, createPlaylistTrackItem(track));
                 });
-    
+                if(!hasLoadedTracks()) {
+                    return;
+                }
+
                 const lastItems = recent.length > probabilityLimit ? recent.slice(-probabilityLimit) : recent;
                 var k = whileMargin; 
 
@@ -649,12 +662,17 @@ function submit(choice) {
 }
 
 function play() {
+    activatePlayer();
     playButton.classList.remove("fa-play");
     playButton.classList.add("fa-pause");
     time = 0; 
 
     isPlaying = true;
-    playSong(localStorage.getItem('uri')); 
+    playSong(localStorage.getItem('uri'))
+        .catch((error) => {
+            console.error(error);
+            pause();
+        });
     toggle(true);
 }
 function pause() {

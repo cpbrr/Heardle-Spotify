@@ -39,7 +39,7 @@ function showBlockingAuthMessage(error) {
     document.body.innerHTML = `
         <main class="auth-message">
             <section>
-                <h1>Hördel</h1>
+                <h1>Heardle</h1>
                 <p>${error.message || 'Spotify login is required.'}</p>
                 <button id="login">Connect Spotify</button>
             </section>

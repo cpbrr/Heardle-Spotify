@@ -1,11 +1,15 @@
-import {toggle, playSong } from './player.js';
+﻿import {toggle, playSong } from './player.js';
+import { getAccessToken, showBlockingAuthMessage } from './auth.js';
 
 var recent = [];
 
 const startupValue = parseInt(localStorage.getItem('value'));
 const startupID = localStorage.getItem('id');
 
-const access_token = accessToken; 
+const access_token = await getAccessToken().catch((error) => {
+    showBlockingAuthMessage(error);
+    throw error;
+});
 const headers = { Authorization: `Bearer ${access_token}` };
 
 var artistName = ''; 
@@ -312,7 +316,11 @@ fetch(`https://api.spotify.com/v1/me/`, { headers })
 // #endregion ------------------------------------------
 
 var listened = 1;
-
+function setListened(value) {
+    listened = value;
+    localStorage.setItem('listened', listened);
+}
+setListened(listened);
 var time = 0; 
 
 var isPlaying = false; 
@@ -640,7 +648,7 @@ function pause() {
 
 function revealMore() {
     if(listened < 6) {
-        listened += 1;
+        setListened(listened + 1);
 
         var part = document.querySelector("#time-parts div:nth-child(" + (listened + 1) + ")");
         part.style.backgroundColor = darkColor;
@@ -679,7 +687,7 @@ function youLost() {
 }
 
 function showSong() {
-    listened++;
+    setListened(listened + 1);
 
     gameOver = true; 
     giveUpButton.style.visibility = "hidden";
@@ -757,7 +765,7 @@ function showSong() {
 playAgainButton.addEventListener('click', restart);
 
 function restart() {
-    listened = 1; 
+    setListened(1);
     time = 0; 
     gameOver = false; 
     giveUpButton.style.visibility = "visible";
@@ -820,3 +828,5 @@ function restart() {
 }
 
 export { listened };
+
+

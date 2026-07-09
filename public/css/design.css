@@ -1,4 +1,4 @@
-:root {
+﻿:root {
     --dark-color: #111;
     --light-color: #ddd;
     --lighter-color: #eee;
@@ -404,4 +404,29 @@ div:has(+ .chosenAlternative) {
 
 #play i:hover, #skip:hover, #submit:hover {
     cursor: pointer;
+}
+.auth-message {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-message section {
+    border: 1px solid var(--gray-color);
+    border-radius: 8px;
+    max-width: 460px;
+    padding: 24px;
+    background: #181818;
+}
+
+.auth-message button {
+    background-color: var(--green-color);
+    border: none;
+    border-radius: 5px;
+    color: var(--light-color);
+    cursor: pointer;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 17px;
+    padding: 10px 16px;
 }

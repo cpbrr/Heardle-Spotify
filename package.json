@@ -8,6 +8,6 @@
     "check": "node --check api/_spotify.js && node --check api/status.js && node --check api/login.js && node --check api/callback.js && node --check api/token.js && node --check api/logout.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": "24.x"
   }
 }

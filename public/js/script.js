@@ -2,6 +2,7 @@ import { activatePlayer, toggle, playSong } from './player.js';
 import { getAccessToken, showBlockingAuthMessage } from './auth.js';
 import { normalizeSpotifyId } from './spotifyInput.js';
 import { createTrackItem, createPlaylistTrackItem, appendUniqueTrack } from './spotifyTracks.js';
+import { getJson, getItems, getSearchTracks } from './spotifyApi.js';
 
 var recent = [];
 
@@ -52,7 +53,14 @@ function hasLoadedTracks() {
     localStorage.removeItem('uri');
     localStorage.removeItem('song');
     return false;
-} 
+}
+
+function showSongLoadError(error) {
+    console.error(error);
+    document.getElementById('song').innerHTML = error.message || 'Unable to load songs';
+    localStorage.removeItem('uri');
+    localStorage.removeItem('song');
+}
 
 var specificSong = false; 
 
@@ -78,10 +86,9 @@ function newSong() {
             limit = 50;
             endpoint = `https://api.spotify.com/v1/search?q=artist:${artistName}&type=${searchType}&limit=${limit}`;
     
-            fetch(endpoint, { headers })
-            .then((response) => response.json())
+            getJson(fetch, endpoint, headers)
             .then((responseData) => {
-                const tracks = responseData.tracks.items;
+                const tracks = getSearchTracks(responseData);
                 tracks.forEach((track) => {
                     appendUniqueTrack(data, createTrackItem(track));
                 });
@@ -90,8 +97,7 @@ function newSong() {
                 }
 
                 const lastItems = recent.length > probabilityLimit ? recent.slice(-probabilityLimit) : recent;
-                var k = whileMargin; 
-
+                var k = 0;
                 do {
                     index = Math.floor(Math.random() * data.length);
                     const song = data[index].titel + " - " + data[index].artist;
@@ -102,20 +108,19 @@ function newSong() {
                     localStorage.setItem('song', song);
                     
                     k++;
-                } while(!lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
+                } while(lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
 
                 recent.push(data[index]);
 
             })
-            .catch((error) => console.error(error));
+            .catch(showSongLoadError);
             break; 
         case 2: // By Artist (ID)
             endpoint = `https://api.spotify.com/v1/artists/${startupID}/albums?market=US&limit=50`;
             
-            fetch(endpoint, { headers })
-                .then((response) => response.json())
+            getJson(fetch, endpoint, headers)
                 .then((responseData) => {
-                    const albums = responseData.items;
+                    const albums = getItems(responseData);
                     const promises = [];
 
                     albums.forEach((album) => {
@@ -124,17 +129,16 @@ function newSong() {
 
                             localStorage.setItem('tracks',  JSON.stringify([]));
 
-                            const promise = fetch(endpoint2, { headers })
-                                .then((response2) => response2.json())
+                            const promise = getJson(fetch, endpoint2, headers)
                                 .then((responseData2) => {
-                                const tracks = responseData2.items;
+                                const tracks = getItems(responseData2);
                                 const temp = JSON.parse(localStorage.getItem('tracks'));
                                 tracks.forEach((track) => {
                                     appendUniqueTrack(temp, createTrackItem(track));
                                 });
                                 localStorage.setItem('tracks', JSON.stringify(temp));
                                 })
-                                .catch((error2) => console.error(error2));
+                                .catch(showSongLoadError);
 
                             promises.push(promise);
                         }
@@ -151,8 +155,7 @@ function newSong() {
                 }
 
                 const lastItems = recent.length > probabilityLimit ? recent.slice(-probabilityLimit) : recent;
-                            var k = whileMargin; 
-
+                            var k = 0;
                             do {
                                 index = Math.floor(Math.random() * data.length);
                                 const song = data[index].titel + " - " + data[index].artist;
@@ -163,23 +166,22 @@ function newSong() {
                                 localStorage.setItem('song', song);
                                 
                                 k++;
-                            } while(!lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
+                            } while(lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
 
                             recent.push(data[index]);
                         })
-                        .catch((error) => console.error(error));
+                        .catch(showSongLoadError);
                 })
-                .catch((error) => console.error(error));
+                .catch(showSongLoadError);
 
             break; 
         case 3: //By Playlist
             limit = 100;
             endpoint = `https://api.spotify.com/v1/playlists/${startupID}/tracks?limit=${limit}`;
     
-            fetch(endpoint, { headers })
-            .then((response) => response.json())
+            getJson(fetch, endpoint, headers)
             .then((responseData) => {
-                const tracks = responseData.items;
+                const tracks = getItems(responseData);
                 tracks.forEach((track) => {
                     appendUniqueTrack(data, createPlaylistTrackItem(track));
                 });
@@ -188,8 +190,7 @@ function newSong() {
                 }
 
                 const lastItems = recent.length > probabilityLimit ? recent.slice(-probabilityLimit) : recent;
-                var k = whileMargin; 
-
+                var k = 0;
                 do {
                     index = Math.floor(Math.random() * data.length);
                     const song = data[index].titel + " - " + data[index].artist;
@@ -200,19 +201,18 @@ function newSong() {
                     localStorage.setItem('song', song);
                     
                     k++;
-                } while(!lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
+                } while(lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
 
                 recent.push(data[index]);
             })
-            .catch((error) => console.error(error));
+            .catch(showSongLoadError);
             break; 
         case 4: //By Album 
             endpoint = `https://api.spotify.com/v1/albums/${startupID}/tracks`;
 
-            fetch(endpoint, { headers })
-            .then((response) => response.json())
+            getJson(fetch, endpoint, headers)
             .then((responseData) => {
-                const tracks = responseData.items;
+                const tracks = getItems(responseData);
                 tracks.forEach((track) => {
                     appendUniqueTrack(data, createTrackItem(track));
                 });
@@ -223,8 +223,7 @@ function newSong() {
                 }
 
                 const lastItems = recent.length > albumProbabilityLimit ? recent.slice(-albumProbabilityLimit) : recent;
-                var k = whileMargin; 
-
+                var k = 0;
                 do {
                     index = Math.floor(Math.random() * data.length);
                     const song = data[index].titel + " - " + data[index].artist;
@@ -235,12 +234,12 @@ function newSong() {
                     localStorage.setItem('song', song);
                     
                     k++;
-                } while(!lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
+                } while(lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
 
                 recent.push(data[index]);
 
             })
-            .catch((error) => console.error(error));
+            .catch(showSongLoadError);
             break; 
         case 5: //Specific song
 
@@ -248,8 +247,7 @@ function newSong() {
 
             endpoint = `https://api.spotify.com/v1/tracks/${startupID}`;
     
-            fetch(endpoint, { headers })
-            .then((response) => response.json())
+            getJson(fetch, endpoint, headers)
             .then((responseData) => {
                 const song = responseData.name + " - " + responseData.artists[0].name;
                 document.getElementById('song').innerHTML = song;
@@ -258,16 +256,15 @@ function newSong() {
                 localStorage.setItem('song', song);
                 localStorage.setItem('duration', responseData.duration_ms);
             })
-            .catch((error) => console.error(error));
+            .catch(showSongLoadError);
             break; 
         case 6: 
             limit = 50;
             endpoint = `https://api.spotify.com/v1/me/top/tracks?limit=${limit}`;
     
-            fetch(endpoint, { headers })
-            .then((response) => response.json())
+            getJson(fetch, endpoint, headers)
             .then((responseData) => {
-                const tracks = responseData.items;
+                const tracks = getItems(responseData);
                 tracks.forEach((track) => {
                     appendUniqueTrack(data, createTrackItem(track));
                 });
@@ -276,8 +273,7 @@ function newSong() {
                 }
 
                 const lastItems = recent.length > probabilityLimit ? recent.slice(-probabilityLimit) : recent;
-                var k = whileMargin; 
-
+                var k = 0;
                 do {
                     index = Math.floor(Math.random() * data.length);
                     const song = data[index].titel + " - " + data[index].artist;
@@ -288,20 +284,19 @@ function newSong() {
                     localStorage.setItem('song', song);
                     
                     k++;
-                } while(!lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
+                } while(lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
 
                 recent.push(data[index]);
             })
-            .catch((error) => console.error(error));
+            .catch(showSongLoadError);
             break; 
         case 7: //My liked songs
             limit = 50;
             endpoint = `https://api.spotify.com/v1/me/tracks?limit=${limit}`;
     
-            fetch(endpoint, { headers })
-            .then((response) => response.json())
+            getJson(fetch, endpoint, headers)
             .then((responseData) => {
-                const tracks = responseData.items;
+                const tracks = getItems(responseData);
                 tracks.forEach((track) => {
                     appendUniqueTrack(data, createPlaylistTrackItem(track));
                 });
@@ -310,8 +305,7 @@ function newSong() {
                 }
 
                 const lastItems = recent.length > probabilityLimit ? recent.slice(-probabilityLimit) : recent;
-                var k = whileMargin; 
-
+                var k = 0;
                 do {
                     index = Math.floor(Math.random() * data.length);
                     const song = data[index].titel + " - " + data[index].artist;
@@ -322,11 +316,11 @@ function newSong() {
                     localStorage.setItem('song', song);
                     
                     k++;
-                } while(!lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
+                } while(lastItems.some(item => item.titel == data[index].titel) && k < whileMargin)
 
                 recent.push(data[index]);
             })
-            .catch((error) => console.error(error));
+            .catch(showSongLoadError);
             break; 
         default: 
             break; 
@@ -340,11 +334,12 @@ newSong();
 var userImg = document.querySelector('#user img');
 var userText = document.querySelector('#user p:last-child');
     
-fetch(`https://api.spotify.com/v1/me/`, { headers })
-.then((response) => response.json())
+getJson(fetch, `https://api.spotify.com/v1/me/`, headers)
 .then((responseData) => {
-    userImg.src = responseData.images[0].url;
-    userText.innerHTML = responseData.display_name; 
+    if(responseData.images && responseData.images[0]) {
+        userImg.src = responseData.images[0].url;
+    }
+    userText.innerHTML = responseData.display_name || 'Spotify user';
 })
 .catch((error) => console.error(error));
 

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 const calls = [];
+const sequence = [];
 const listeners = {};
 
 global.window = {};
@@ -10,6 +11,7 @@ global.localStorage = {
     },
 };
 global.fetch = async (url, options = {}) => {
+    sequence.push(String(url));
     calls.push({ url: String(url), options });
 
     if(String(url) === '/api/token') {
@@ -50,6 +52,10 @@ global.Spotify = {
             });
         }
 
+        activateElement() {
+            sequence.push('sdk:activateElement');
+        }
+
         togglePlay() {
             calls.push({ url: 'sdk:togglePlay', options: {} });
             return Promise.resolve();
@@ -75,3 +81,8 @@ assert.deepEqual(JSON.parse(playbackCall.options.body), {
     uris: ['spotify:track:abc'],
     position_ms: 0,
 });
+
+const activationIndex = sequence.indexOf('sdk:activateElement');
+const playIndex = sequence.findIndex((item) => item.startsWith('https://api.spotify.com/v1/me/player/play'));
+assert.ok(activationIndex !== -1, 'playSong should activate the SDK player from the play gesture');
+assert.ok(activationIndex < playIndex, 'SDK activation must happen before the play request');

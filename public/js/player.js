@@ -53,7 +53,7 @@ async function waitForDeviceId() {
 window.onSpotifyWebPlaybackSDKReady = async () => {
     const currentToken = await ensureToken();
     player = new Spotify.Player({
-        name: 'Hordel Spotify Player',
+        name: 'Heardle Spotify Player',
         getOAuthToken: async (cb) => { cb(await ensureToken()); },
         volume: 0.5,
     });
@@ -112,6 +112,12 @@ window.onSpotifyWebPlaybackSDKReady = async () => {
         }
     });
 };
+
+function activatePlayer() {
+    if(player && typeof player.activateElement === 'function') {
+        player.activateElement();
+    }
+}
 
 function toggle(on) {
     play = on;
@@ -177,4 +183,4 @@ const nextSong = async () => {
     console.log('Skipped to next song');
 };
 
-export { toggle, playSong, nextSong };
+export { activatePlayer, toggle, playSong, nextSong };

@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/views/startup.html" },
+    { "source": "/game", "destination": "/views/index.html" }
+  ]
+}

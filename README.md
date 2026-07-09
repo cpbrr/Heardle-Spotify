@@ -1,122 +1,61 @@
-<a name="readme-top"></a>
+# Heardle Spotify
 
-[![LinkedIn][linkedin-shield]][linkedin-url]
+A Spotify Heardle-style game hosted as static files plus Vercel Serverless Functions.
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/aliceakesson)
+## What You Need
 
-<br />
-<div align="center">
-  <a href="https://github.com/aliceakesson/Heardle-Spotify/">
-    <img src="public/icon.png" alt="Logo" width="80" height="80">
-  </a>
+- A Spotify Premium account for playback through Spotify's Web Playback SDK.
+- A Spotify Developer app from https://developer.spotify.com/dashboard.
+- Vercel environment variables for the Spotify app credentials.
 
-  <h3 align="center">Heardle Spotify</h3>
+## Spotify App Setup
 
-  <p align="center">
-    Heardle built on a Node.js server using Spotify's Web API
-  </p>
-</div>
+Create a Spotify app, then add a redirect URI that matches where the app runs:
 
-<!-- ABOUT THE PROJECT -->
-## About The Project
+- Local Vercel dev: `http://localhost:3000/api/callback`
+- Production: `https://YOUR-VERCEL-DOMAIN.vercel.app/api/callback`
+- Custom domain: `https://YOUR-DOMAIN/api/callback`
 
-<p>
-This is another version of Heardle made completely by me, where the user can choose freely regarding choice of music. For example: song by artist, song by playlist or a song from the user's top songs.
-</p>
+The app shows the exact redirect URI on the first screen when credentials are missing.
 
-<br><br>
+## Environment Variables
 
-<div style="display: flex;justify-content: center;align-items: center;margin:auto">
-  <img src="https://user-images.githubusercontent.com/91065258/231267216-1965ff1b-522f-48c2-8547-0763d472e100.png" style="width:45%">
-  <img src="https://user-images.githubusercontent.com/91065258/231267239-c5100193-34b0-455d-9496-87c140602f44.png" style="width:45%">
-</div>
+Set these in Vercel Project Settings -> Environment Variables:
 
-<br><br>
+```env
+SPOTIFY_CLIENT_ID=your_spotify_client_id
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+```
 
-## Requirements
+Optional override:
 
-Sadly, this project requires the user to have some sort of Spotify Premium membership. This is because, as for now, you will need to start your own Spotify Application to play it (more about this in the installation guide further down).
+```env
+SPOTIFY_REDIRECT_URI=https://your-domain/api/callback
+```
 
-## Built With
+For local development, copy `.env.example` to `.env.local` and fill in the values. Vercel CLI loads `.env.local` during `vercel dev`.
 
-<p>
-The site runs on a local host, made using Node.js. Further, it's built using Spotify's Web API and the Spotify Web Playback SDK, where the user will have to authenticate using <a href="https://datatracker.ietf.org/doc/html/rfc6749">OAuth 2.0</a>. 
-</p>
-
-* [![Node][node-shield]][node-url]
-* [![JavaScript][js-shield]][js-url]
-* [![HTML][html-shield]][html-url]
-* [![CSS][css-shield]][css-url]
-
-
-## Installation
-
-If you don't already have NodeJS installed, you will need to do that first. NodeJS can be installed [here](https://nodejs.org/en).
-
-As mentioned in the requirements, you will first need to create your own Spotify Application. This is easily done through <a href="https://developer.spotify.com/dashboard">the Spotify Dashboard</a>. The steps are as following: 
-
-1. Click on "Create app"
-2. Give the app a name (any) and a short description
-3. Leave the textfield for "Website" blank. This is not needed
-4. Enter 'http://localhost:8888/callback' for the redirect URL
-5. Check the terms of service box 
-6. Click on "Save"
-
-Now, proceed to download and extract the zip-file of this GitHub project. Open the project in any code editor and locate the environment-file (.env) which is located in the 'public' folder. The values for CLIENT_ID and CLIENT_SECRET can be found by clicking on the settings of your Spotify Application (The client secret will be visible by clicking on "View client secret"). Enter these values for their respective variables in the environment. 
-
-> **Note:** The values should not be written inside string literals, they should just be inserted as they are (eg. CLIENT_ID=1234567890, not CLIENT_ID="1234567890")
-
-The application requires you to run it on a local server (this is done using Node.js and nodemon), thus you will therefore afterwards have to download these. In the your terminal, go to the directory of the project and then go to the folder named 'public' using this command: 
+## Run Locally
 
 ```sh
-  cd public
-  ```  
-> **Note:** This command is based off of the Windows terminal. It may vary depending on the operative system.
+npm install`r`nnpx vercel dev
+```
 
-After that, install npm and nodemon in the current folder using the following two commands: 
+Open `http://localhost:3000`. The app will either show the missing Spotify setup values or a Connect Spotify button. After connecting, choose a song source and play.
 
-```sh
-  npm install 
-  ```
+## Deploy To Vercel
 
-```sh
-  npm install -g nodemon
-  ```
-  
- If everything goes well, the application should then be playable by calling the command to start the server, then open up the server in your browser of choice at <a>http://localhost:8888/login</a>.
- 
- ```sh
-  nodemon server.js
-  ```
+1. Import this repo into Vercel.
+2. Add `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` in project environment variables.
+3. Add the production callback URL in the Spotify Dashboard.
+4. Deploy.
 
-It can be exited at anytime by using Ctrl+C in the terminal, or be refreshed by simply writing the following: 
+## How Auth Works
 
-```sh
-  rs
-  ```
-## Having Problems?
-First, check the following: 
-- Your Spotify-application is open
-- You've opened it thorugh the correct URL, i.e. localhost:8888/login
-- Your server is running through your commando prompt
+- `/api/login` redirects to Spotify OAuth.
+- `/api/callback` exchanges the code for tokens and stores them in HTTP-only cookies.
+- `/api/token` returns a fresh access token to the browser for Spotify Web API and Web Playback SDK calls.
+- `/api/status` powers the setup/login panel.
+- `/api/logout` clears the token cookies.
 
-After that, you might try the following:
-- Check that you've achieved an accesstoken in **public/views/index.html**, at first it was empty
-- Start some song thorugh Spotify, restart the server through **rs** and reload the page
-- Check that your application through **Spotify Dashboard** is correctly made and that you've inserted the correct **CLIENT_ID** and **CLIENT_SECRET** in your **public/.env**
-
-<!-- CONTACT -->
-## Contact
-
-Alice Åkesson - alicek732@gmail.com
-
-[css-shield]: https://img.shields.io/badge/CSS-239120?&style=for-the-badge&logo=css3&logoColor=white
-[css-url]: https://www.w3.org/Style/CSS/Overview.en.html
-[html-shield]: https://img.shields.io/badge/HTML-239120?style=for-the-badge&logo=html5&logoColor=white
-[html-url]: https://html.com/
-[js-shield]: https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black
-[js-url]: https://www.javascript.com/
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://www.linkedin.com/in/alice-%C3%A5kesson-20a066215/
-[node-shield]: https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white
-[node-url]: https://nodejs.org/en
+No client secret is exposed to browser JavaScript. The old local flow wrote tokens into `public/views/index.html`; the Vercel flow does not mutate files at runtime.

@@ -1,10 +1,32 @@
-﻿import {toggle, playSong } from './player.js';
+import {toggle, playSong } from './player.js';
 import { getAccessToken, showBlockingAuthMessage } from './auth.js';
+import { normalizeSpotifyId } from './spotifyInput.js';
 
 var recent = [];
 
 const startupValue = parseInt(localStorage.getItem('value'));
-const startupID = localStorage.getItem('id');
+const rawStartupID = localStorage.getItem('id');
+const startupID = getStartupId(startupValue, rawStartupID);
+
+function getStartupId(value, id) {
+    if(value === 2) {
+        return normalizeSpotifyId(id, 'artist');
+    }
+
+    if(value === 3) {
+        return normalizeSpotifyId(id, 'playlist');
+    }
+
+    if(value === 4) {
+        return normalizeSpotifyId(id, 'album');
+    }
+
+    if(value === 5) {
+        return normalizeSpotifyId(id, 'track');
+    }
+
+    return String(id || '').trim();
+}
 
 const access_token = await getAccessToken().catch((error) => {
     showBlockingAuthMessage(error);
@@ -219,7 +241,7 @@ function newSong() {
                 const song = responseData.name + " - " + responseData.artists[0].name;
                 document.getElementById('song').innerHTML = song;
     
-                localStorage.setItem('uri', 'spotify:track:' + startupID);
+                localStorage.setItem('uri', responseData.uri || 'spotify:track:' + startupID);
                 localStorage.setItem('song', song);
                 localStorage.setItem('duration', responseData.duration_ms);
             })
@@ -828,5 +850,3 @@ function restart() {
 }
 
 export { listened };
-
-

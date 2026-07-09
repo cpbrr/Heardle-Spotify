@@ -1,4 +1,4 @@
-﻿:root {
+:root {
     --dark-color: #111;
     --light-color: #ddd;
     --lighter-color: #eee;
@@ -430,3 +430,18 @@ div:has(+ .chosenAlternative) {
     font-size: 17px;
     padding: 10px 16px;
 }
+
+.fa-solid,
+.fa-regular {
+    align-items: center;
+    display: inline-flex;
+    font-style: normal;
+    justify-content: center;
+}
+
+.fa-play::before { content: "\25B6"; }
+.fa-pause::before { content: "II"; }
+.fa-magnifying-glass::before { content: "\2315"; }
+.fa-xmark::before { content: "\00D7"; }
+.fa-check::before { content: "\2713"; }
+.fa-square::before { content: "\25A1"; }

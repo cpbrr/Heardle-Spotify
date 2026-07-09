@@ -1,9 +1,13 @@
-﻿import { getAccessToken } from './auth.js';
+import { getAccessToken } from './auth.js';
 
-var play = false;
-var tempPlay = false;
-var hasRestarted = false;
-var token = null;
+let play = false;
+let token = null;
+let player = null;
+let deviceId = null;
+let resolveDeviceReady;
+let deviceReady = new Promise((resolve) => {
+    resolveDeviceReady = resolve;
+});
 
 async function ensureToken() {
     if(!token) {
@@ -13,37 +17,73 @@ async function ensureToken() {
     return token;
 }
 
+async function spotifyRequest(url, options = {}) {
+    const response = await fetch(url, options);
+    const payload = await response.json().catch(() => ({}));
+
+    if(!response.ok) {
+        const message = payload?.error?.message || payload.message || payload.error || 'Spotify playback request failed';
+        throw new Error(message);
+    }
+
+    return payload;
+}
+
+function playbackUrl(path, targetDeviceId) {
+    const url = new URL(`https://api.spotify.com/v1/me/player/${path}`);
+
+    if(targetDeviceId) {
+        url.searchParams.set('device_id', targetDeviceId);
+    }
+
+    return url.toString();
+}
+
+async function waitForDeviceId() {
+    if(deviceId) {
+        return deviceId;
+    }
+
+    return Promise.race([
+        deviceReady,
+        new Promise((resolve) => setTimeout(() => resolve(null), 5000)),
+    ]);
+}
+
 window.onSpotifyWebPlaybackSDKReady = async () => {
     const currentToken = await ensureToken();
-    const player = new Spotify.Player({
-        name: 'Web Playback SDK Quick Start Player',
-        getOAuthToken: cb => { cb(currentToken); },
-        volume: 0.5
+    player = new Spotify.Player({
+        name: 'Hordel Spotify Player',
+        getOAuthToken: async (cb) => { cb(await ensureToken()); },
+        volume: 0.5,
     });
 
     player.addListener('ready', ({ device_id }) => {
+        deviceId = device_id;
+        resolveDeviceReady(device_id);
         console.log('Ready with Device ID', device_id);
-        fetch('https://api.spotify.com/v1/me/player', {
+
+        spotifyRequest('https://api.spotify.com/v1/me/player', {
             headers: {
-                'Authorization': 'Bearer ' + currentToken
-            }
+                Authorization: `Bearer ${currentToken}`,
+            },
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to fetch data from API');
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.is_playing) {
-                pauseSong();
-            }
-        })
-        .catch(error => console.error('An error occurred while checking if the player is playing music:', error));
-        printState();
+            .then((data) => {
+                if(data.is_playing) {
+                    pauseSong();
+                }
+            })
+            .catch((error) => console.error('An error occurred while checking if the player is playing music:', error));
     });
 
     player.addListener('not_ready', ({ device_id }) => {
+        if(deviceId === device_id) {
+            deviceId = null;
+            deviceReady = new Promise((resolve) => {
+                resolveDeviceReady = resolve;
+            });
+        }
+
         console.log('Device ID has gone offline', device_id);
     });
 
@@ -53,127 +93,88 @@ window.onSpotifyWebPlaybackSDKReady = async () => {
 
     player.addListener('authentication_error', ({ message }) => {
         console.error(message);
+        token = null;
     });
 
     player.addListener('account_error', ({ message }) => {
         console.error(message);
     });
 
-    player.connect().then(success => {
-        if (success) {
+    player.addListener('playback_error', ({ message }) => {
+        console.error(message);
+    });
+
+    player.connect().then((success) => {
+        if(success) {
             console.log('The Web Playback SDK successfully connected to Spotify!');
         } else {
             console.log('The Web Playback SDK couldnt connect to Spotify');
         }
     });
-
-    setInterval(run, 10);
-
-    function run() {
-        if(play && !tempPlay) {
-            restart();
-            player.togglePlay();
-        } else if(!play && tempPlay) {
-            pauseSong();
-        }
-
-        if(Number(localStorage.getItem('listened') || 1) > 6 && !hasRestarted) {
-            restart();
-            play = true;
-            hasRestarted = true;
-        }
-
-        tempPlay = play;
-    }
-
-    function printState() {
-        player.getCurrentState().then(state => {
-            if (!state) {
-              console.error('User is not playing music through the Web Playback SDK');
-              return;
-            }
-
-            var current_track = state.track_window.current_track;
-            var next_track = state.track_window.next_tracks[0];
-
-            console.log('Currently Playing', current_track);
-            console.log('Playing Next', next_track);
-        });
-    }
-
-    const restart = async () => {
-        fetch('https://api.spotify.com/v1/me/player/seek?position_ms=0', {
-        method: 'PUT',
-        headers: {
-            'Authorization': `Bearer ${currentToken}`
-        }
-        })
-        .then(response => {
-            if (!response.ok) {
-            throw new Error('Failed to restart song');
-            }
-        })
-        .catch(error => {
-            console.error(error);
-        });
-    };
 };
 
 function toggle(on) {
     play = on;
+
+    if(!on) {
+        pauseSong();
+    }
 }
 
 const playSong = async (uri) => {
+    if(!uri) {
+        throw new Error('No Spotify track URI is loaded.');
+    }
+
     const currentToken = await ensureToken();
-    fetch('https://api.spotify.com/v1/me/player/play', {
+    const targetDeviceId = await waitForDeviceId();
+
+    if(player && typeof player.activateElement === 'function') {
+        player.activateElement();
+    }
+
+    await spotifyRequest(playbackUrl('play', targetDeviceId), {
         method: 'PUT',
         headers: {
-            'Authorization': `Bearer ${currentToken}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${currentToken}`,
+            'Content-Type': 'application/json',
         },
         body: JSON.stringify({
             uris: [uri],
-            position_ms: 0
-        })
-    })
-    .catch(error => console.error(error));
+            position_ms: 0,
+        }),
+    });
+
+    play = true;
 };
 
 const pauseSong = async () => {
     const currentToken = await ensureToken();
-    fetch('https://api.spotify.com/v1/me/player/pause', {
+    const targetDeviceId = deviceId;
+
+    await spotifyRequest(playbackUrl('pause', targetDeviceId), {
         method: 'PUT',
         headers: {
-            'Authorization': `Bearer ${currentToken}`
-        }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to pause song');
-            }
-        })
-        .catch(error => {
-            console.error(error);
+            Authorization: `Bearer ${currentToken}`,
+        },
+    }).catch((error) => {
+        console.error(error);
     });
+
+    play = false;
 };
 
 const nextSong = async () => {
     const currentToken = await ensureToken();
-    fetch('https://api.spotify.com/v1/me/player/next', {
-    method: 'POST',
-    headers: {
-        'Authorization': `Bearer ${currentToken}`
-    }
-    })
-    .then(response => {
-        if (!response.ok) {
-        throw new Error('Failed to skip to next song');
-        }
-        console.log('Skipped to next song');
-    })
-    .catch(error => {
-        console.error(error);
+
+    await spotifyRequest(playbackUrl('next', deviceId), {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${currentToken}`,
+        },
     });
+
+    console.log('Skipped to next song');
 };
 
 export { toggle, playSong, nextSong };

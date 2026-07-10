@@ -1,6 +1,12 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/views/startup.html" },
-    { "source": "/game", "destination": "/views/index.html" }
+    {
+      "source": "/game",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }

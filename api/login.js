@@ -4,18 +4,20 @@ const {
   createState,
   getConfig,
   isConfigured,
-  sendJson,
+  sendError,
   serializeCookie,
   setCookies,
 } = require('./_spotify');
 
 module.exports = function handler(req, res) {
-  const config = getConfig(req);
+  if (req.method !== 'GET') {
+    sendError(res, 405, 'method_not_allowed', 'Use GET to connect Spotify.');
+    return;
+  }
 
+  const config = getConfig(req);
   if (!isConfigured(config)) {
-    sendJson(res, 500, {
-      error: 'missing_spotify_credentials',
-      message: 'Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel environment variables.',
+    sendError(res, 503, 'missing_spotify_credentials', 'Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to continue.', {
       redirectUri: config.redirectUri,
     });
     return;

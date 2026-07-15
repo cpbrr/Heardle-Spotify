@@ -1,0 +1,62 @@
+:root {
+  color-scheme: dark;
+  --bg: #0d0f0e;
+  --surface: #151816;
+  --surface-raised: #1b1f1c;
+  --text: #f4f6f4;
+  --muted: #9ca39e;
+  --border: #343a36;
+  --accent: #1ed760;
+  --accent-strong: #18b950;
+  --danger: #e45b5b;
+  --radius: 8px;
+  --content: 42rem;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { min-height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); }
+button, select, input { font: inherit; }
+button, .button { min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius); padding: .65rem 1rem; background: var(--surface-raised); color: var(--text); cursor: pointer; }
+button:hover, .button:hover { border-color: var(--accent); }
+button:disabled { cursor: not-allowed; opacity: .5; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+main, .app-header { width: min(calc(100% - 32px), var(--content)); margin-inline: auto; }
+main { padding-block: 1.5rem 3rem; }
+.app-header { min-height: 56px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.app-header span, .wordmark { font-weight: 800; letter-spacing: .02em; }
+.setup-screen, .loading-screen { display: grid; gap: 1rem; align-content: start; }
+.setup-content, .game-screen, .result-view, .source-picker { display: grid; gap: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: clamp(1rem, 4vw, 2rem); }
+.game-screen { grid-template-columns: 1fr; }
+.game-screen h1 { margin: 0; }
+.game-screen ol { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.game-screen li { min-height: 44px; display: flex; align-items: center; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-raised); overflow-wrap: anywhere; }
+.game-screen form { display: grid; gap: .75rem; }
+.game-screen select { width: 100%; min-height: 44px; margin-top: .35rem; padding: .5rem; background: var(--surface-raised); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); }
+.source-picker__header { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: .5rem; }
+.source-picker__header > div { min-width: 0; }
+.source-list, .source-search, .search-results, .config-list { display: grid; gap: .5rem; }
+.source-row { display: grid; gap: .25rem; text-align: left; min-height: 64px; }
+.source-row small, .muted, .eyebrow { color: var(--muted); }
+.search-field { min-height: 44px; display: flex; align-items: center; gap: .5rem; border: 1px solid var(--border); border-radius: var(--radius); padding-inline: .75rem; }
+.search-field input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); }
+.search-result { display: flex; align-items: center; gap: .75rem; text-align: left; }
+.search-result img, .artwork-placeholder { width: 48px; height: 48px; aspect-ratio: 1; object-fit: cover; flex: 0 0 auto; background: var(--surface-raised); }
+.config-value { display: flex; align-items: center; gap: .5rem; min-width: 0; padding: .5rem; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius); }
+.config-value code { min-width: 0; overflow-wrap: anywhere; }
+.icon-button { width: 44px; min-width: 44px; padding: .5rem; display: inline-grid; place-items: center; }
+.button--primary { background: var(--accent); color: #08120c; border-color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.status-message--error, [role="alert"] { color: var(--danger); }
+
+@media (max-width: 520px) {
+  main, .app-header { width: min(calc(100% - 24px), var(--content)); }
+  main { padding-block: 1rem 2rem; }
+  .setup-content, .game-screen, .result-view, .source-picker { padding: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

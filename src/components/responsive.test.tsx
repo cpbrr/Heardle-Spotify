@@ -29,7 +29,7 @@ describe('responsive style constraints', () => {
     expect(css).toContain('prefers-reduced-motion');
     expect(css).toContain('min-height: 44px');
     expect(css).toContain('overflow-wrap: anywhere');
-    expect(css).not.toMatch(/gradient|letter-spacing:\\s*-|\\d+vw/);
+    expect(css).not.toMatch(/gradient|letter-spacing:\s*-|\\d+vw/);
   });
 });
 
@@ -46,3 +46,5 @@ describe('responsive design contract', () => {
     expect(css).toContain('prefers-reduced-motion');
   });
 });
+
+

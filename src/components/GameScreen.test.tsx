@@ -53,3 +53,17 @@ describe('GameScreen interactions', () => {
   });
 });
 
+
+describe('GameScreen playback failures', () => {
+  it('renders an ordinary playback failure instead of requesting auth recovery', async () => {
+    let recovered = 0;
+    const player = { activate: async () => { throw new Error('Speaker unavailable'); }, playClip: async () => undefined, pause: async () => undefined };
+    const user = userEvent.setup();
+    render(<GameScreen round={createRound(tracks[0])} tracks={tracks} player={player} onRoundChange={() => undefined} onRoundComplete={() => undefined} onAuthExpired={() => { recovered += 1; }} />);
+
+    await user.click(screen.getByRole('button', { name: 'Play 1 second clip' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Speaker unavailable');
+    expect(recovered).toBe(0);
+  });
+});
+

@@ -4,7 +4,6 @@ const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const SCOPES = [
   'user-top-read',
-  'user-read-currently-playing',
   'user-read-private',
   'user-read-email',
   'app-remote-control',
@@ -12,7 +11,6 @@ const SCOPES = [
   'streaming',
   'user-read-playback-state',
   'user-library-read',
-  'user-library-modify',
 ];
 
 function getConfig(req) {
@@ -21,8 +19,8 @@ function getConfig(req) {
   const origin = process.env.SPOTIFY_REDIRECT_ORIGIN || `${protocol}://${host}`;
 
   return {
-    clientId: process.env.SPOTIFY_CLIENT_ID || process.env.CLIENT_ID,
-    clientSecret: process.env.SPOTIFY_CLIENT_SECRET || process.env.CLIENT_SECRET,
+    clientId: process.env.SPOTIFY_CLIENT_ID,
+    clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
     redirectUri: process.env.SPOTIFY_REDIRECT_URI || `${origin}/api/callback`,
     origin,
   };
@@ -90,15 +88,29 @@ function createState() {
   return crypto.randomBytes(16).toString('hex');
 }
 
-function createTokenRequestBody(values) {
-  return new URLSearchParams(values).toString();
-}
-
 function createAuthHeader(config) {
   return `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`;
 }
 
-async function exchangeCodeForTokens(config, code) {
+async function requestTokens(config, values) {
+  const response = await fetch(SPOTIFY_TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: createAuthHeader(config),
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams(values).toString(),
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload.error_description || payload.error || 'Spotify token request failed');
+  }
+
+  return payload;
+}
+
+function exchangeCodeForTokens(config, code) {
   return requestTokens(config, {
     grant_type: 'authorization_code',
     code,
@@ -106,39 +118,20 @@ async function exchangeCodeForTokens(config, code) {
   });
 }
 
-async function refreshAccessToken(config, refreshToken) {
+function refreshAccessToken(config, refreshToken) {
   return requestTokens(config, {
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
   });
 }
 
-async function requestTokens(config, body) {
-  const response = await fetch(SPOTIFY_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: createAuthHeader(config),
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: createTokenRequestBody(body),
-  });
-  const payload = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    const message = payload.error_description || payload.error || 'Spotify token request failed';
-    throw new Error(message);
-  }
-
-  return payload;
-}
-
 function setTokenCookies(res, tokenPayload, existingRefreshToken) {
-  const expiresIn = tokenPayload.expires_in || 3600;
+  const expiresIn = Number(tokenPayload.expires_in || 3600);
   const expiresAt = Date.now() + expiresIn * 1000;
   const refreshToken = tokenPayload.refresh_token || existingRefreshToken;
   const cookies = [
     serializeCookie('spotify_access_token', tokenPayload.access_token, { maxAge: expiresIn }),
-    serializeCookie('spotify_token_expires_at', String(expiresAt), { maxAge: Math.max(expiresIn, 60 * 60 * 24 * 30) }),
+    serializeCookie('spotify_token_expires_at', String(expiresAt), { maxAge: 60 * 60 * 24 * 30 }),
   ];
 
   if (refreshToken) {
@@ -154,6 +147,16 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function sendError(res, statusCode, code, message, options = {}) {
+  sendJson(res, statusCode, {
+    code,
+    message,
+    retryable: Boolean(options.retryable),
+    ...(options.loginUrl ? { loginUrl: options.loginUrl } : {}),
+    ...(options.redirectUri ? { redirectUri: options.redirectUri } : {}),
+  });
+}
+
 module.exports = {
   SCOPES,
   SPOTIFY_AUTH_URL,
@@ -164,6 +167,7 @@ module.exports = {
   isConfigured,
   parseCookies,
   refreshAccessToken,
+  sendError,
   sendJson,
   serializeCookie,
   setCookies,

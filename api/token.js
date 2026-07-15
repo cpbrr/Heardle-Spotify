@@ -4,17 +4,20 @@ const {
   isConfigured,
   parseCookies,
   refreshAccessToken,
+  sendError,
   sendJson,
   setTokenCookies,
 } = require('./_spotify');
 
 module.exports = async function handler(req, res) {
-  const config = getConfig(req);
+  if (req.method !== 'GET') {
+    sendError(res, 405, 'method_not_allowed', 'Use GET to request a Spotify token.');
+    return;
+  }
 
+  const config = getConfig(req);
   if (!isConfigured(config)) {
-    sendJson(res, 500, {
-      error: 'missing_spotify_credentials',
-      message: 'Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel environment variables.',
+    sendError(res, 503, 'missing_spotify_credentials', 'Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to continue.', {
       redirectUri: config.redirectUri,
     });
     return;
@@ -27,16 +30,12 @@ module.exports = async function handler(req, res) {
   const stillFresh = accessToken && expiresAt && Date.now() < expiresAt - 60 * 1000;
 
   if (stillFresh) {
-    sendJson(res, 200, {
-      accessToken,
-      expiresAt,
-    });
+    sendJson(res, 200, { accessToken, expiresAt });
     return;
   }
 
   if (!refreshToken) {
-    sendJson(res, 401, {
-      error: 'not_authenticated',
+    sendError(res, 401, 'not_authenticated', 'Connect Spotify to continue.', {
       loginUrl: '/api/login',
     });
     return;
@@ -44,16 +43,15 @@ module.exports = async function handler(req, res) {
 
   try {
     const tokenPayload = await refreshAccessToken(config, refreshToken);
+    const refreshedExpiresAt = Date.now() + Number(tokenPayload.expires_in || 3600) * 1000;
     setTokenCookies(res, tokenPayload, refreshToken);
     sendJson(res, 200, {
       accessToken: tokenPayload.access_token,
-      expiresAt: Date.now() + (tokenPayload.expires_in || 3600) * 1000,
+      expiresAt: refreshedExpiresAt,
     });
   } catch (error) {
     clearAuthCookies(res);
-    sendJson(res, 401, {
-      error: 'refresh_failed',
-      message: error.message || 'Spotify token refresh failed',
+    sendError(res, 401, 'refresh_failed', error.message || 'Spotify token refresh failed.', {
       loginUrl: '/api/login',
     });
   }

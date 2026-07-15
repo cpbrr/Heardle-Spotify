@@ -1,13 +1,37 @@
 {
-  "name": "heardle-spotify-vercel",
-  "version": "1.0.0",
+  "name": "heardle-spotify",
+  "version": "2.0.0",
   "private": true,
-  "description": "A Vercel-hosted Spotify Heardle app.",
+  "description": "A reliable Spotify Premium Heardle game.",
   "scripts": {
-    "test": "node --test public/js/*.test.mjs",
-    "check": "node --check api/_spotify.js && node --check api/status.js && node --check api/login.js && node --check api/callback.js && node --check api/token.js && node --check api/logout.js"
+    "test": "vitest",
+    "check": "npm run typecheck && npm run check:api && npm run test:run && npm run build",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "test:run": "vitest run",
+    "typecheck": "tsc -b --pretty false",
+    "check:api": "node --check api/_spotify.js && node --check api/status.js && node --check api/login.js && node --check api/callback.js && node --check api/token.js && node --check api/logout.js",
+    "start": "vercel dev"
   },
   "engines": {
     "node": "24.x"
+  },
+  "dependencies": {
+    "lucide-react": "1.24.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "jsdom": "29.1.1",
+    "typescript": "7.0.2",
+    "vite": "8.1.4",
+    "vitest": "4.1.10"
   }
 }

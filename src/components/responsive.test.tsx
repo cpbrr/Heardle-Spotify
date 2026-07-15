@@ -34,3 +34,15 @@ describe('responsive style constraints', () => {
 });
 
 
+
+describe('responsive design contract', () => {
+  it('contains all required tokens, constraints, and control sizing', () => {
+    const css = fs.readFileSync(path.resolve(process.cwd(), 'src/styles/global.css'), 'utf8');
+    for (const token of ['--bg: #0d0f0e', '--surface: #151816', '--surface-raised: #1b1f1c', '--text: #f4f6f4', '--muted: #9ca39e', '--border: #343a36', '--accent: #1ed760', '--accent-strong: #18b950', '--danger: #e45b5b', '--radius: 8px', '--content: 42rem']) expect(css).toContain(token);
+    expect(css).toContain('minmax(0, 1fr)');
+    expect(css).toContain('.artwork.artwork-placeholder');
+    expect(css).toContain('width: min(100%, 18rem)');
+    expect((css.match(/min-height: 44px/g) || []).length).toBeGreaterThan(0);
+    expect(css).toContain('prefers-reduced-motion');
+  });
+});

@@ -63,3 +63,4 @@ main { padding-block: 1.5rem 3rem; }
 }
 
 
+.artwork.artwork-placeholder { width: min(100%, 18rem); height: auto; aspect-ratio: 1; }

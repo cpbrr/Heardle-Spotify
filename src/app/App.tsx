@@ -18,6 +18,11 @@ function isAuthenticationError(error: unknown) {
   return error instanceof AppError && (error.status === 401 || error.code.includes('auth'));
 }
 
+type ResumeContext =
+  | { type: 'load-source'; source: SourceDescriptor }
+  | { type: 'play-clip'; source: SourceDescriptor; tracks: Track[]; round: Round }
+  | { type: 'full-track'; source: SourceDescriptor; tracks: Track[]; round: Round; outcome: 'won' | 'lost' };
+
 export function App() {
   const [state, dispatch] = useReducer(appReducer, initialAppState);
   const [round, setRound] = useState<Round | null>(null);
@@ -25,7 +30,7 @@ export function App() {
   const requestId = useRef(0);
   const catalogController = useRef<AbortController | null>(null);
   const player = useRef<SpotifyPlayer | null>(null);
-  const resumeContext = useRef<{ type: 'load-source' | 'play'; source?: SourceDescriptor; tracks?: Track[] } | null>(null);
+  const resumeContext = useRef<ResumeContext | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -51,19 +56,27 @@ export function App() {
     const resumeAfterLogin = () => {
       void getAuthStatus().then((status) => {
         if (!status.configured || !status.authenticated) return;
-        if (!player.current) player.current = new SpotifyPlayer();
         const resume = resumeContext.current;
+        if (!resume) return;
+        if (!player.current) player.current = new SpotifyPlayer();
         resumeContext.current = null;
-        if (resume?.type === 'load-source' && resume.source) {
+        if (resume.type === 'load-source') {
           setRound(null);
           dispatch({ type: 'sourceSelected', source: resume.source, requestId: ++requestId.current });
           return;
         }
-        if (resume?.type === 'play' && resume.source && resume.tracks) {
+        if (resume.type === 'play-clip') {
+          setRound(resume.round);
           dispatch({ type: 'resumeRound', source: resume.source, tracks: resume.tracks });
+          void player.current?.activate().then(() => player.current?.playClip(resume.round.answer.uri, resume.round.clipLimitMs, () => undefined)).catch(() => undefined);
           return;
         }
-        dispatch({ type: 'authChecked', status });
+        if (resume.type === 'full-track') {
+          setRound(resume.round);
+          dispatch({ type: 'resumeResult', source: resume.source, tracks: resume.tracks, outcome: resume.outcome });
+          void player.current?.playFullTrack(resume.round.answer.uri).catch(() => undefined);
+          return;
+        }
       }).catch(() => undefined);
     };
     window.addEventListener('focus', resumeAfterLogin);
@@ -88,8 +101,9 @@ export function App() {
         if (isAuthenticationError(error)) {
           try {
             const status = await getAuthStatus();
+            if (controller.signal.aborted || catalogController.current !== controller) return;
             resumeContext.current = { type: 'load-source', source };
-            if (!controller.signal.aborted) dispatch({ type: 'authExpired', status, resumeAction: { type: 'load-source', source } });
+            dispatch({ type: 'authExpired', status, resumeAction: { type: 'load-source', source } });
           } catch (statusError) {
             if (!controller.signal.aborted) dispatch({ type: 'failed', error: statusError as AppError });
           }
@@ -102,12 +116,14 @@ export function App() {
 
   useEffect(() => {
     if (state.phase !== 'preparing-player') return;
-    setRound(createRound(state.tracks[0]));
+    const preparedRound = createRound(state.tracks[0]);
+    setRound(preparedRound);
     void player.current?.connect()
       .then(() => dispatch({ type: 'playerReady' }))
       .catch(async (error: unknown) => {
         if (isAuthenticationError(error)) {
           const status = await getAuthStatus();
+          resumeContext.current = { type: 'play-clip', source: state.source, tracks: state.tracks, round: preparedRound };
           dispatch({ type: 'authExpired', status, resumeAction: { type: 'play' } });
         } else {
           dispatch({ type: 'failed', error: error as AppError });
@@ -134,7 +150,17 @@ export function App() {
       return;
     }
     const status = await getAuthStatus();
-    if (state.phase === 'ready' || state.phase === 'playing') resumeContext.current = { type: 'play', source: state.source, tracks: state.tracks };
+    if ((state.phase === 'ready' || state.phase === 'playing') && round) resumeContext.current = { type: 'play-clip', source: state.source, tracks: state.tracks, round };
+    dispatch({ type: 'authExpired', status, resumeAction: { type: 'play' } });
+  }
+
+  async function recoverResultPlayback(error: unknown, source: SourceDescriptor, tracks: Track[], completedRound: Round, outcome: 'won' | 'lost') {
+    if (!isAuthenticationError(error)) {
+      dispatch({ type: 'failed', error: error as AppError });
+      return;
+    }
+    const status = await getAuthStatus();
+    resumeContext.current = { type: 'full-track', source, tracks, round: completedRound, outcome };
     dispatch({ type: 'authExpired', status, resumeAction: { type: 'play' } });
   }
 
@@ -162,7 +188,7 @@ export function App() {
       try {
         await player.current?.playFullTrack(round.answer.uri);
       } catch (error) {
-        await recoverPlayback(error);
+        await recoverResultPlayback(error, state.source, state.tracks, round, state.outcome);
       }
     })()} onPlayAnother={() => void (async () => {
       await player.current?.pause().catch(() => undefined);

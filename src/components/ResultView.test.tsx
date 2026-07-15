@@ -12,3 +12,16 @@ describe('ResultView', () => {
   });
 });
 
+
+describe('ResultView callbacks', () => {
+  it('clicks full-track and play-another controls', () => {
+    let fullTrack = 0;
+    let another = 0;
+    render(<ResultView outcome="won" title="Answer Song" artist="Artist" onPlayFullTrack={() => { fullTrack += 1; }} onPlayAnother={() => { another += 1; }} />);
+    screen.getByRole('button', { name: 'Play full track' }).click();
+    screen.getByRole('button', { name: 'Play another' }).click();
+    expect(fullTrack).toBe(1);
+    expect(another).toBe(1);
+  });
+});
+

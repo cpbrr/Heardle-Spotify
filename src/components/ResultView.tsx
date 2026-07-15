@@ -9,6 +9,7 @@ interface ResultViewProps {
 export function ResultView({ outcome, title, artist, onPlayFullTrack, onPlayAnother }: ResultViewProps) {
   return (
     <section className="result-view" aria-label="Round result">
+      <div className="artwork artwork-placeholder" aria-hidden="true" />
       <h2>{outcome === 'won' ? 'You got it!' : 'Better luck next time'}</h2>
       <p>{title} - {artist}</p>
       <button type="button" onClick={onPlayFullTrack}>Play full track</button>
@@ -16,3 +17,5 @@ export function ResultView({ outcome, title, artist, onPlayFullTrack, onPlayAnot
     </section>
   );
 }
+
+

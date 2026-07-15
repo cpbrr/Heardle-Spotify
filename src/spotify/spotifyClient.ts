@@ -18,7 +18,7 @@ export class SpotifyClient {
 
   constructor(dependencies: SpotifyClientDependencies = {}) {
     this.getToken = dependencies.getToken || getAccessToken;
-    this.fetchImpl = dependencies.fetchImpl || fetch;
+    this.fetchImpl = dependencies.fetchImpl || globalThis.fetch.bind(globalThis);
   }
 
   async request<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {

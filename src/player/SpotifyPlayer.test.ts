@@ -38,6 +38,25 @@ describe('SpotifyPlayer', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('calls the browser fetch implementation with the global receiver', async () => {
+    const sdkPlayer = new SdkPlayerDouble();
+    const browserFetch = vi.fn(function (this: typeof globalThis) {
+      if (this !== globalThis) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+      }
+      return Promise.resolve(successfulResponse());
+    });
+    vi.stubGlobal('fetch', browserFetch);
+    const player = new SpotifyPlayer({
+      getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
+      loadSdk: vi.fn().mockResolvedValue(playerNamespace(sdkPlayer)),
+    });
+
+    await player.connect();
+    await expect(player.playFullTrack('spotify:track:abc')).resolves.toBeUndefined();
   });
 
   it('activates the SDK before transferring and playing a clip', async () => {

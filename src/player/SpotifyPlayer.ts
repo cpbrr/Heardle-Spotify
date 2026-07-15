@@ -73,7 +73,7 @@ export class SpotifyPlayer {
 
   constructor(dependencies: PlayerDependencies = {}) {
     this.getToken = dependencies.getToken || getAccessToken;
-    this.fetchImpl = dependencies.fetchImpl || fetch;
+    this.fetchImpl = dependencies.fetchImpl || globalThis.fetch.bind(globalThis);
     this.loadSdk = dependencies.loadSdk || loadSpotifySdk;
   }
 

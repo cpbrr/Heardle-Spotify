@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AppError } from '../auth/authClient';
 import { SpotifyClient } from './spotifyClient';
@@ -11,6 +11,25 @@ function jsonResponse(status: number, body: unknown, headers?: HeadersInit) {
 }
 
 describe('SpotifyClient', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('calls the browser fetch implementation with the global receiver', async () => {
+    const browserFetch = vi.fn(function (this: typeof globalThis) {
+      if (this !== globalThis) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+      }
+      return Promise.resolve(jsonResponse(200, { id: 'me' }));
+    });
+    vi.stubGlobal('fetch', browserFetch);
+    const client = new SpotifyClient({
+      getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
+    });
+
+    await expect(client.request('/me')).resolves.toEqual({ id: 'me' });
+  });
+
   it('authorizes Spotify Web API requests', async () => {
     const getToken = vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 });
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { id: 'me' }));

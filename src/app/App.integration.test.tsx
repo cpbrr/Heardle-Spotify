@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
   loadStreak: vi.fn(),
   saveStreak: vi.fn(),
   saveSource: vi.fn(),
+  loadRecentTrackIds: vi.fn(() => []),
+  saveRecentTrackIds: vi.fn(),
+  sourceKey: vi.fn(() => 'top'),
   SpotifyPlayer: vi.fn(),
 }));
 
@@ -36,6 +39,9 @@ vi.mock('../sources/sourceStorage', async (importOriginal) => ({
   loadStreak: mocks.loadStreak,
   saveStreak: mocks.saveStreak,
   saveSource: mocks.saveSource,
+  loadRecentTrackIds: mocks.loadRecentTrackIds,
+  saveRecentTrackIds: mocks.saveRecentTrackIds,
+  sourceKey: mocks.sourceKey,
 }));
 vi.mock('../player/SpotifyPlayer', () => ({
   SpotifyPlayer: mocks.SpotifyPlayer,
@@ -156,6 +162,33 @@ describe('App game workflow', () => {
 
     expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
     expect(mocks.loadCatalog).toHaveBeenCalledTimes(1);
+    expect(mocks.getAuthStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts pending focus authentication and does not replay after unmount', async () => {
+    const focusAuth = deferred<typeof authStatus>();
+    mocks.loadCatalog.mockResolvedValue({ tracks, exclusions: { duplicates: 0, unavailable: 0, unsupported: 0 } });
+    mocks.player.activate.mockRejectedValueOnce(new AppError('Session expired.', { status: 401, code: 'spotify_authentication_error' }));
+    mocks.getAuthStatus
+      .mockResolvedValueOnce(authStatus)
+      .mockResolvedValueOnce({ ...authStatus, authenticated: false })
+      .mockReturnValueOnce(focusAuth.promise);
+    const view = render(<App />);
+
+    await chooseTopTracks();
+    await userEvent.click(await screen.findByRole('button', { name: 'Play 1 second clip' }));
+    await screen.findByRole('link', { name: 'Connect Spotify' });
+    window.dispatchEvent(new Event('focus'));
+    await vi.waitFor(() => expect(mocks.getAuthStatus).toHaveBeenCalledTimes(3));
+    const focusSignal = mocks.getAuthStatus.mock.calls[2][0] as AbortSignal;
+    expect(focusSignal).toBeInstanceOf(AbortSignal);
+
+    view.unmount();
+    expect(focusSignal.aborted).toBe(true);
+    await act(async () => focusAuth.resolve(authStatus));
+
+    expect(mocks.SpotifyPlayer).toHaveBeenCalledTimes(1);
+    expect(mocks.player.playClip).not.toHaveBeenCalled();
   });
 
   it('resumes a playable round after playback authentication is restored', async () => {
@@ -209,6 +242,24 @@ describe('App game workflow', () => {
 
     expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
     expect(mocks.loadCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a Change source action available during gameplay and results', async () => {
+    mocks.loadCatalog.mockResolvedValue({ tracks, exclusions: { duplicates: 0, unavailable: 0, unsupported: 0 } });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await chooseTopTracks();
+    expect(await screen.findByRole('banner')).toContainElement(
+      screen.getByRole('button', { name: 'Change source' }),
+    );
+
+    await user.selectOptions(screen.getByLabelText('Guess'), 'track-1');
+    await user.click(screen.getByRole('button', { name: 'Submit guess' }));
+    expect(await screen.findByRole('button', { name: 'Play full track' })).toBeVisible();
+    expect(screen.getByRole('banner')).toContainElement(
+      screen.getByRole('button', { name: 'Change source' }),
+    );
   });
 
   it('persists a winning streak and pauses before starting another round from results', async () => {

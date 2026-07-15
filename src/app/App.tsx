@@ -7,10 +7,10 @@ import { ConfigurationScreen } from '../components/ConfigurationScreen';
 import { ResultView } from '../components/ResultView';
 import { SourcePicker } from '../components/SourcePicker';
 import { StatusMessage } from '../components/StatusMessage';
-import { createRound, type Round } from '../game/gameEngine';
+import { createRound, selectRoundTrack, type Round } from '../game/gameEngine';
 import { SpotifyPlayer } from '../player/SpotifyPlayer';
 import { loadCatalog } from '../sources/catalog';
-import { loadStreak, saveSource, saveStreak } from '../sources/sourceStorage';
+import { loadRecentTrackIds, loadStreak, saveRecentTrackIds, saveSource, saveStreak, sourceKey } from '../sources/sourceStorage';
 import type { SourceDescriptor, Track } from '../spotify/types';
 import { appReducer, initialAppState } from './appReducer';
 
@@ -23,6 +23,10 @@ type ResumeContext =
   | { type: 'play-clip'; source: SourceDescriptor; tracks: Track[]; round: Round }
   | { type: 'full-track'; source: SourceDescriptor; tracks: Track[]; round: Round; outcome: 'won' | 'lost' };
 
+function AppHeader({ onChangeSource }: { onChangeSource(): void }) {
+  return <header className="app-header"><span>Heardle</span><button type="button" onClick={onChangeSource}>Change source</button></header>;
+}
+
 export function App() {
   const [state, dispatch] = useReducer(appReducer, initialAppState);
   const [round, setRound] = useState<Round | null>(null);
@@ -31,9 +35,11 @@ export function App() {
   const catalogController = useRef<AbortController | null>(null);
   const player = useRef<SpotifyPlayer | null>(null);
   const resumeContext = useRef<ResumeContext | null>(null);
+  const mounted = useRef(true);
 
   useEffect(() => {
     const controller = new AbortController();
+    mounted.current = true;
     void getAuthStatus(controller.signal)
       .then((status) => {
         if (status.configured && status.authenticated && !player.current) {
@@ -45,6 +51,7 @@ export function App() {
         if (!controller.signal.aborted) dispatch({ type: 'failed', error });
       });
     return () => {
+      mounted.current = false;
       controller.abort();
       catalogController.current?.abort();
       player.current?.destroy();
@@ -53,11 +60,16 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    let focusController: AbortController | null = null;
     const resumeAfterLogin = () => {
-      void getAuthStatus().then((status) => {
+      const resume = resumeContext.current;
+      if (!resume) return;
+      focusController?.abort();
+      const controller = new AbortController();
+      focusController = controller;
+      void getAuthStatus(controller.signal).then((status) => {
+        if (controller.signal.aborted || !mounted.current) return;
         if (!status.configured || !status.authenticated) return;
-        const resume = resumeContext.current;
-        if (!resume) return;
         if (!player.current) player.current = new SpotifyPlayer();
         resumeContext.current = null;
         if (resume.type === 'load-source') {
@@ -80,7 +92,10 @@ export function App() {
       }).catch(() => undefined);
     };
     window.addEventListener('focus', resumeAfterLogin);
-    return () => window.removeEventListener('focus', resumeAfterLogin);
+    return () => {
+      focusController?.abort();
+      window.removeEventListener('focus', resumeAfterLogin);
+    };
   }, []);
 
   useEffect(() => {
@@ -116,7 +131,7 @@ export function App() {
 
   useEffect(() => {
     if (state.phase !== 'preparing-player') return;
-    const preparedRound = createRound(state.tracks[0]);
+    const preparedRound = nextRound(state.source, state.tracks);
     setRound(preparedRound);
     void player.current?.connect()
       .then(() => dispatch({ type: 'playerReady' }))
@@ -154,6 +169,13 @@ export function App() {
     dispatch({ type: 'authExpired', status, resumeAction: { type: 'play' } });
   }
 
+  function nextRound(source: SourceDescriptor, catalog: Track[]) {
+    const key = sourceKey(source);
+    const answer = selectRoundTrack(catalog, loadRecentTrackIds(key));
+    saveRecentTrackIds(key, [...loadRecentTrackIds(key), answer.id]);
+    return createRound(answer);
+  }
+
   async function recoverResultPlayback(error: unknown, source: SourceDescriptor, tracks: Track[], completedRound: Round, outcome: 'won' | 'lost') {
     if (!isAuthenticationError(error)) {
       dispatch({ type: 'failed', error: error as AppError });
@@ -176,15 +198,15 @@ export function App() {
     return <main className="setup-screen"><p className="wordmark">Heardle</p><StatusMessage tone="error">{state.error.message}</StatusMessage></main>;
   }
   if ((state.phase === 'ready' || state.phase === 'playing') && round && player.current) {
-    return <GameScreen round={round} tracks={state.tracks} player={player.current} onRoundChange={setRound} onRoundComplete={(completed) => {
+    return <><AppHeader onChangeSource={() => void changeSource()} /><GameScreen round={round} tracks={state.tracks} player={player.current} onRoundChange={setRound} onRoundComplete={(completed) => {
       const nextStreak = completed.status === 'won' ? streak + 1 : 0;
       setStreak(nextStreak);
       saveStreak(nextStreak);
       dispatch({ type: 'roundCompleted', outcome: completed.status === 'won' ? 'won' : 'lost' });
-    }} onAuthExpired={(error) => void recoverPlayback(error)} />;
+    }} onAuthExpired={(error) => void recoverPlayback(error)} /></>;
   }
   if (state.phase === 'round-complete' && round && player.current) {
-    return <main className="game-screen"><ResultView outcome={state.outcome} title={round.answer.title} artist={round.answer.artistText} onPlayFullTrack={() => void (async () => {
+    return <><AppHeader onChangeSource={() => void changeSource()} /><main className="game-screen"><ResultView outcome={state.outcome} title={round.answer.title} artist={round.answer.artistText} onPlayFullTrack={() => void (async () => {
       try {
         await player.current?.playFullTrack(round.answer.uri);
       } catch (error) {
@@ -192,9 +214,9 @@ export function App() {
       }
     })()} onPlayAnother={() => void (async () => {
       await player.current?.pause().catch(() => undefined);
-      setRound(createRound(state.tracks[0]));
+      setRound(nextRound(state.source, state.tracks));
       dispatch({ type: 'roundRestarted' });
-    })()} /></main>;
+    })()} /></main></>;
   }
   return <main className="loading-screen"><h1>Heardle</h1><p>Checking Spotify connection...</p></main>;
 }

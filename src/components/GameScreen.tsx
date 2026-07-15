@@ -16,14 +16,14 @@ export function GameScreen({ round, tracks = [], player, onRoundChange, onRoundC
   const play = async () => { setError(null); try { await player.activate(); await player.playClip(round.answer.uri, round.clipLimitMs, () => undefined); } catch (failure) { recover(failure); } };
   const update = (next: Round) => { onRoundChange?.(next); if (next.status !== 'playing') onRoundComplete?.(next); };
   const skip = async () => { setError(null); try { await player.pause(); update(skipAttempt(round)); } catch (failure) { recover(failure); } };
-  const submit = (trackId: string) => { const track = tracks.find((item) => item.id === trackId); if (track) update(submitGuess(round, { trackId: track.id, label: `${track.title} - ${track.artistText}` })); };
+  const submit = async (trackId: string) => { const track = tracks.find((item) => item.id === trackId); if (!track) return; const next = submitGuess(round, { trackId: track.id, label: `${track.title} - ${track.artistText}` }); try { if (next.status !== 'playing') await player.pause(); update(next); } catch (failure) { recover(failure); } };
   const seconds = Math.round(round.clipLimitMs / 1000);
   const disabled = round.status !== 'playing';
   return (
     <main className="game-screen"><h1>Heardle</h1>
       <ol aria-label="Attempts">{round.attempts.map((attempt, index) => <li key={index}>{attempt.kind === 'pending' ? 'Pending' : attempt.kind === 'skipped' ? 'Skipped' : attempt.label}</li>)}</ol>
       {error && <p role="alert">{error}</p>}
-      <form onSubmit={(event) => { event.preventDefault(); submit(String(new FormData(event.currentTarget).get('guess') || '')); }}>
+      <form onSubmit={(event) => { event.preventDefault(); void submit(String(new FormData(event.currentTarget).get('guess') || '')); }}>
         <label>Guess <select name="guess" defaultValue="" disabled={disabled}><option value="">Choose a song</option>{tracks.map((track) => <option key={track.id} value={track.id}>{track.title} - {track.artistText}</option>)}</select></label>
         <button type="submit" disabled={disabled}>Submit guess</button>
       </form>

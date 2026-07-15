@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { GameScreen } from './GameScreen';
 
@@ -16,6 +16,13 @@ import type { Track } from '../spotify/types';
 const tracks: Track[] = [
   { id: 'answer', uri: 'spotify:track:answer', title: 'Answer Song', artists: ['Artist'], artistText: 'Artist', durationMs: 180_000, album: 'Album', imageUrl: null },
 ];
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
 
 describe('GameScreen clip controls', () => {
   it('plays the current clip and exposes the matching clip label', () => {
@@ -87,6 +94,25 @@ describe('GameScreen completion interactions', () => {
     await user.click(screen.getByRole('button', { name: 'Submit guess' }));
     expect(changed?.status).toBe('won');
     expect(completed).toBe(1);
+  });
+
+  it('pauses playback before emitting a terminal guess', async () => {
+    const pause = deferred<void>();
+    const pausePlayback = vi.fn(() => pause.promise);
+    let completed = 0;
+    let changed: ReturnType<typeof createRound> | undefined;
+    const user = userEvent.setup();
+    render(<GameScreen round={createRound(tracks[0])} tracks={tracks} player={{ activate: async () => undefined, playClip: async () => undefined, pause: pausePlayback }} onRoundChange={(round) => { changed = round; }} onRoundComplete={() => { completed += 1; }} onAuthExpired={() => undefined} />);
+
+    await user.selectOptions(screen.getByLabelText('Guess'), 'answer');
+    await user.click(screen.getByRole('button', { name: 'Submit guess' }));
+    expect(pausePlayback).toHaveBeenCalledTimes(1);
+    expect(changed).toBeUndefined();
+    expect(completed).toBe(0);
+
+    pause.resolve();
+    await vi.waitFor(() => expect(completed).toBe(1));
+    expect(changed?.status).toBe('won');
   });
 
   it('completes a final skip as a loss and disables terminal controls', async () => {

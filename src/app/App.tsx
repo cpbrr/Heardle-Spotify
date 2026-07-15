@@ -10,37 +10,29 @@ import { StatusMessage } from '../components/StatusMessage';
 import { createRound, type Round } from '../game/gameEngine';
 import { SpotifyPlayer } from '../player/SpotifyPlayer';
 import { loadCatalog } from '../sources/catalog';
-import type { SourceDescriptor } from '../spotify/types';
+import { loadStreak, saveSource, saveStreak } from '../sources/sourceStorage';
+import type { SourceDescriptor, Track } from '../spotify/types';
 import { appReducer, initialAppState } from './appReducer';
 
 function isAuthenticationError(error: unknown) {
   return error instanceof AppError && (error.status === 401 || error.code.includes('auth'));
 }
 
-function createPlayer() {
-  try {
-    return new SpotifyPlayer();
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes('not a constructor')) {
-      return (SpotifyPlayer as unknown as () => SpotifyPlayer)();
-    }
-    throw error;
-  }
-}
-
 export function App() {
   const [state, dispatch] = useReducer(appReducer, initialAppState);
   const [round, setRound] = useState<Round | null>(null);
+  const [streak, setStreak] = useState(() => loadStreak());
   const requestId = useRef(0);
   const catalogController = useRef<AbortController | null>(null);
   const player = useRef<SpotifyPlayer | null>(null);
+  const resumeContext = useRef<{ type: 'load-source' | 'play'; source?: SourceDescriptor; tracks?: Track[] } | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     void getAuthStatus(controller.signal)
       .then((status) => {
         if (status.configured && status.authenticated && !player.current) {
-          player.current = createPlayer();
+          player.current = new SpotifyPlayer();
         }
         dispatch({ type: 'authChecked', status });
       })
@@ -53,6 +45,29 @@ export function App() {
       player.current?.destroy();
       player.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    const resumeAfterLogin = () => {
+      void getAuthStatus().then((status) => {
+        if (!status.configured || !status.authenticated) return;
+        if (!player.current) player.current = new SpotifyPlayer();
+        const resume = resumeContext.current;
+        resumeContext.current = null;
+        if (resume?.type === 'load-source' && resume.source) {
+          setRound(null);
+          dispatch({ type: 'sourceSelected', source: resume.source, requestId: ++requestId.current });
+          return;
+        }
+        if (resume?.type === 'play' && resume.source && resume.tracks) {
+          dispatch({ type: 'resumeRound', source: resume.source, tracks: resume.tracks });
+          return;
+        }
+        dispatch({ type: 'authChecked', status });
+      }).catch(() => undefined);
+    };
+    window.addEventListener('focus', resumeAfterLogin);
+    return () => window.removeEventListener('focus', resumeAfterLogin);
   }, []);
 
   useEffect(() => {
@@ -73,6 +88,7 @@ export function App() {
         if (isAuthenticationError(error)) {
           try {
             const status = await getAuthStatus();
+            resumeContext.current = { type: 'load-source', source };
             if (!controller.signal.aborted) dispatch({ type: 'authExpired', status, resumeAction: { type: 'load-source', source } });
           } catch (statusError) {
             if (!controller.signal.aborted) dispatch({ type: 'failed', error: statusError as AppError });
@@ -101,6 +117,7 @@ export function App() {
 
   function selectSource(source: SourceDescriptor) {
     setRound(null);
+    saveSource(source);
     dispatch({ type: 'sourceSelected', source, requestId: ++requestId.current });
   }
 
@@ -117,6 +134,7 @@ export function App() {
       return;
     }
     const status = await getAuthStatus();
+    if (state.phase === 'ready' || state.phase === 'playing') resumeContext.current = { type: 'play', source: state.source, tracks: state.tracks };
     dispatch({ type: 'authExpired', status, resumeAction: { type: 'play' } });
   }
 
@@ -132,10 +150,25 @@ export function App() {
     return <main className="setup-screen"><p className="wordmark">Heardle</p><StatusMessage tone="error">{state.error.message}</StatusMessage></main>;
   }
   if ((state.phase === 'ready' || state.phase === 'playing') && round && player.current) {
-    return <GameScreen round={round} tracks={state.tracks} player={player.current} onRoundChange={setRound} onRoundComplete={(completed) => dispatch({ type: 'roundCompleted', outcome: completed.status === 'won' ? 'won' : 'lost' })} onAuthExpired={(error) => void recoverPlayback(error)} />;
+    return <GameScreen round={round} tracks={state.tracks} player={player.current} onRoundChange={setRound} onRoundComplete={(completed) => {
+      const nextStreak = completed.status === 'won' ? streak + 1 : 0;
+      setStreak(nextStreak);
+      saveStreak(nextStreak);
+      dispatch({ type: 'roundCompleted', outcome: completed.status === 'won' ? 'won' : 'lost' });
+    }} onAuthExpired={(error) => void recoverPlayback(error)} />;
   }
   if (state.phase === 'round-complete' && round && player.current) {
-    return <main className="game-screen"><ResultView outcome={state.outcome} title={round.answer.title} artist={round.answer.artistText} onPlayFullTrack={() => void player.current?.playFullTrack(round.answer.uri).catch(recoverPlayback)} onPlayAnother={() => { setRound(createRound(state.tracks[0])); dispatch({ type: 'playerReady' }); }} /></main>;
+    return <main className="game-screen"><ResultView outcome={state.outcome} title={round.answer.title} artist={round.answer.artistText} onPlayFullTrack={() => void (async () => {
+      try {
+        await player.current?.playFullTrack(round.answer.uri);
+      } catch (error) {
+        await recoverPlayback(error);
+      }
+    })()} onPlayAnother={() => void (async () => {
+      await player.current?.pause().catch(() => undefined);
+      setRound(createRound(state.tracks[0]));
+      dispatch({ type: 'roundRestarted' });
+    })()} /></main>;
   }
   return <main className="loading-screen"><h1>Heardle</h1><p>Checking Spotify connection...</p></main>;
 }

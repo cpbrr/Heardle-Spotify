@@ -22,6 +22,8 @@ export type AppAction =
   | { type: 'playbackStarted' }
   | { type: 'playbackPaused' }
   | { type: 'roundCompleted'; outcome: 'won' | 'lost' }
+  | { type: 'roundRestarted' }
+  | { type: 'resumeRound'; source: SourceDescriptor; tracks: Track[] }
   | { type: 'authExpired'; status: AuthStatus; resumeAction?: ResumeAction }
   | { type: 'failed'; error: AppError; resumeAction?: ResumeAction };
 
@@ -74,6 +76,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         return state;
       }
       return { ...state, phase: 'round-complete', outcome: action.outcome };
+    case 'roundRestarted':
+      if (state.phase !== 'round-complete') {
+        return state;
+      }
+      return { phase: 'ready', source: state.source, tracks: state.tracks };
+    case 'resumeRound':
+      return { phase: 'ready', source: action.source, tracks: action.tracks };
     case 'authExpired':
       return {
         phase: 'needs-login',

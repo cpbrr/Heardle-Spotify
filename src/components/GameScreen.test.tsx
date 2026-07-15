@@ -35,3 +35,21 @@ describe('GameScreen clip controls', () => {
   });
 });
 import userEvent from '@testing-library/user-event';
+
+describe('GameScreen interactions', () => {
+  it('activates before playback and submits a catalog-derived wrong guess', async () => {
+    const calls: string[] = [];
+    let changed: ReturnType<typeof createRound> | undefined;
+    const player = { activate: async () => { calls.push('activate'); }, playClip: async () => { calls.push('play'); }, pause: async () => undefined };
+    const user = userEvent.setup();
+    render(<GameScreen round={createRound(tracks[0])} tracks={[...tracks, { ...tracks[0], id: 'other', title: 'Other Song' }]} player={player} onRoundChange={(round) => { changed = round; }} onRoundComplete={() => undefined} onAuthExpired={() => undefined} />);
+
+    await user.click(screen.getByRole('button', { name: 'Play 1 second clip' }));
+    expect(calls).toEqual(['activate', 'play']);
+    await user.selectOptions(screen.getByLabelText('Guess'), 'other');
+    await user.click(screen.getByRole('button', { name: 'Submit guess' }));
+    expect(changed).toMatchObject({ attemptIndex: 1 });
+    expect(changed?.attempts[0]).toEqual({ kind: 'incorrect', label: 'Other Song - Artist' });
+  });
+});
+

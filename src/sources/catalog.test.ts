@@ -123,12 +123,16 @@ describe('loadCatalog', () => {
 });
 
 describe('searchTracks', () => {
-  it('searches the global track catalog with the development-mode limit', async () => {
+  it('searches the global track catalog with a five-result limit', async () => {
     const client = fakeClient({
-      '/search?q=dreams&type=track&limit=10': { tracks: { items: [spotifyTrack('global')] } },
+      '/search?q=dreams&type=track&limit=5': { tracks: { items: [spotifyTrack('global')] } },
     });
 
     await expect(searchTracks('dreams', undefined, client)).resolves.toMatchObject([{ id: 'global' }]);
+    expect(client.request).toHaveBeenCalledWith(
+      '/search?q=dreams&type=track&limit=5',
+      expect.objectContaining({ signal: undefined }),
+    );
   });
 
   it('resolves a pasted track URL exactly', async () => {
@@ -140,6 +144,32 @@ describe('searchTracks', () => {
 });
 
 describe('searchSources', () => {
+  it('uses five results for track searches', async () => {
+    const client = fakeClient({
+      '/search?q=dreams&type=track&limit=5': { tracks: { items: [spotifyTrack('global')] } },
+    });
+
+    await searchSources('track', 'dreams', undefined, client);
+
+    expect(client.request).toHaveBeenCalledWith(
+      '/search?q=dreams&type=track&limit=5',
+      expect.anything(),
+    );
+  });
+
+  it('retains eight results for album searches', async () => {
+    const client = fakeClient({
+      '/search?q=dreams&type=album&limit=8': { albums: { items: [] } },
+    });
+
+    await searchSources('album', 'dreams', undefined, client);
+
+    expect(client.request).toHaveBeenCalledWith(
+      '/search?q=dreams&type=album&limit=8',
+      expect.anything(),
+    );
+  });
+
   it.each([
     ['playlist', 'track', '4iV5W9uYEdYUVa79Axb7Rh', spotifyTrack('4iV5W9uYEdYUVa79Axb7Rh')],
     ['track', 'playlist', 'playlist123', {

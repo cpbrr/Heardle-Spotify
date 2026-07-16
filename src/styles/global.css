@@ -74,6 +74,10 @@ main { padding-block: 1.5rem 3rem; }
   background: color-mix(in srgb, var(--accent) 12%, var(--surface-raised));
 }
 
+.track-search__result[data-active="true"] {
+  border-color: var(--text);
+}
+
 .track-search__metadata,
 .track-search__selection {
   display: grid;

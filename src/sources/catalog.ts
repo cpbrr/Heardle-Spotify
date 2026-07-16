@@ -235,7 +235,7 @@ export async function searchTracks(
   }
 
   const response = await client.request<{ tracks?: { items?: unknown[] } }>(
-    `/search?q=${encodeURIComponent(query.trim())}&type=track&limit=10`,
+    `/search?q=${encodeURIComponent(query.trim())}&type=track&limit=5`,
     { signal },
   );
   return (response.tracks?.items || []).flatMap((item) => {
@@ -271,8 +271,9 @@ export async function searchSources(
   }
 
   const type = kind.startsWith('artist') ? 'artist' : kind;
+  const limit = type === 'track' ? 5 : 8;
   const response: Record<string, unknown> = await client.request(
-    `/search?q=${encodeURIComponent(query.trim())}&type=${type}&limit=8`,
+    `/search?q=${encodeURIComponent(query.trim())}&type=${type}&limit=${limit}`,
     { signal },
   );
   const bucket = record(response[`${type}s`]);

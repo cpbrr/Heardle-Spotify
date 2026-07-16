@@ -151,28 +151,34 @@ export function TrackSearch({
 
       {results.length > 0 ? (
         <div id={listboxId} className="search-results track-search__results" role="listbox" aria-label="Track search results">
-          {results.map((track, index) => (
-            <button
-              type="button"
-              role="option"
-              aria-selected={activeIndex === index}
-              id={`${listboxId}-option-${index}`}
-              className="search-result track-search__result"
-              key={track.id}
-              onMouseEnter={() => setActiveIndex(index)}
-              onClick={() => selectTrack(track)}
-            >
-              {track.imageUrl ? (
-                <img src={track.imageUrl} alt="" width="48" height="48" />
-              ) : (
-                <span className="artwork-placeholder" aria-hidden="true" />
-              )}
-              <span className="track-search__metadata">
-                <strong>{track.title}</strong>
-                <small>{track.artistText}{track.album ? ` · ${track.album}` : ''}</small>
-              </span>
-            </button>
-          ))}
+          {results.map((track, index) => {
+            const isSelected = selectedTrack?.id === track.id;
+            const isActive = activeIndex === index;
+
+            return (
+              <button
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                data-active={isActive ? 'true' : undefined}
+                id={`${listboxId}-option-${index}`}
+                className="search-result track-search__result"
+                key={track.id}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => selectTrack(track)}
+              >
+                {track.imageUrl ? (
+                  <img src={track.imageUrl} alt="" width="48" height="48" />
+                ) : (
+                  <span className="artwork-placeholder" aria-hidden="true" />
+                )}
+                <span className="track-search__metadata">
+                  <strong>{track.title}</strong>
+                  <small>{track.artistText}{track.album ? ` · ${track.album}` : ''}</small>
+                </span>
+              </button>
+            );
+          })}
         </div>
       ) : null}
 

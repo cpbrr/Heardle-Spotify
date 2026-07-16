@@ -52,3 +52,37 @@ Non-blocking environment warnings:
 - Graphify reported the installed skill at 0.9.7 while the package is 0.9.11.
 - Graphify reported hooks.json and settings.json as zero-node sources.
 - git diff --check emitted existing LF-to-CRLF warnings, including unrelated node_modules files, but returned success.
+
+## Follow-up: stale debounced search race
+
+### Outcome
+
+DONE
+
+TrackSearch now stores the active search AbortController in a ref. Every raw input edit aborts and invalidates that controller synchronously, before the 250 ms debounced query changes. Effect cleanup only clears the ref when it still owns the same controller. Existing signal checks therefore reject late results even when a search implementation ignores abort and resolves its promise.
+
+### TDD evidence
+
+RED:
+
+- Command: npm test -- --run src/components/TrackSearch.test.tsx
+- Result: 1 failed, 6 passed.
+- The deferred query-A response restored a stale Dreams option after the user edited the raw input to query B but before query B's debounce elapsed.
+
+GREEN:
+
+- Command: npm test -- --run src/components/TrackSearch.test.tsx src/components/GameScreen.test.tsx
+- Result: 2 files passed, 18 tests passed.
+
+### Final verification
+
+- npm run check: passed.
+  - TypeScript and API syntax checks passed.
+  - Vitest: 17 files passed, 120 tests passed.
+  - Production build passed; 1,790 modules transformed.
+- graphify update .: passed; graph rebuilt to 594 nodes, 799 edges, 77 communities.
+- git diff --check: exit 0.
+
+### Concerns
+
+No functional concerns. Existing non-blocking Node localStorage, Graphify version/zero-node, and LF-to-CRLF warnings remain unchanged.

@@ -1,5 +1,5 @@
 import { Search } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type React from 'react';
 
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -31,6 +31,7 @@ export function TrackSearch({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [retryNonce, setRetryNonce] = useState(0);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+  const activeRequest = useRef<AbortController | null>(null);
   const debouncedQuery = useDebouncedValue(query, 250);
   const listboxId = useId();
 
@@ -44,7 +45,9 @@ export function TrackSearch({
       return;
     }
 
+    activeRequest.current?.abort();
     const controller = new AbortController();
+    activeRequest.current = controller;
     setState('loading');
     setError('');
     setActiveIndex(-1);
@@ -61,7 +64,10 @@ export function TrackSearch({
         setState('error');
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (activeRequest.current === controller) activeRequest.current = null;
+    };
   }, [debouncedQuery, disabled, retryNonce, search]);
 
   function selectTrack(track: Track) {
@@ -70,6 +76,8 @@ export function TrackSearch({
   }
 
   function changeQuery(nextQuery: string) {
+    activeRequest.current?.abort();
+    activeRequest.current = null;
     setQuery(nextQuery);
     setResults([]);
     setState('idle');

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -56,6 +56,24 @@ describe('TrackSearch', () => {
 
     expect(signals[0].aborted).toBe(true);
     expect(await screen.findByRole('option', { name: /dreams \(live\)/i })).toBeVisible();
+  });
+
+  it('does not restore query A results while query B is waiting for debounce', async () => {
+    let resolveFirst!: (tracks: Track[]) => void;
+    const firstRequest = new Promise<Track[]>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const search = vi.fn().mockReturnValueOnce(firstRequest).mockResolvedValue([]);
+    const user = userEvent.setup();
+    render(<TrackSearch onSelect={vi.fn()} search={search} />);
+    const input = screen.getByRole('combobox', { name: 'Guess' });
+
+    await user.type(input, 'dreams');
+    await waitFor(() => expect(search).toHaveBeenCalledWith('dreams', expect.any(AbortSignal)));
+    await user.type(input, ' live');
+    await act(async () => resolveFirst([makeTrack('old', 'Dreams')]));
+
+    expect(screen.queryByRole('option', { name: /^dreams/i })).not.toBeInTheDocument();
   });
 
   it('exposes retry after failure and announces an empty result', async () => {

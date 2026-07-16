@@ -76,6 +76,22 @@ describe('authClient', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/token?force=1', expect.objectContaining({ signal: undefined }));
   });
 
+  it('preserves the reconnect URL when a forced refresh requires login', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(401, {
+      code: 'not_authenticated',
+      message: 'Connect Spotify to continue.',
+      retryable: false,
+      loginUrl: '/api/login',
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(getAccessToken(undefined, true)).rejects.toMatchObject({
+      code: 'not_authenticated',
+      loginUrl: '/api/login',
+    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/token?force=1', expect.any(Object));
+  });
+
   it('clears the token cache when logging out', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse(200, {

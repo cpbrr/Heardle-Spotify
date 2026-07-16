@@ -77,6 +77,19 @@ describe('App authentication states', () => {
     render(<App />);
 
     expect(await screen.findByText(/Users Management/)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Connect Spotify' })).toHaveAttribute('href', '/api/login');
     expect(screen.queryByText('Spotify request failed.')).not.toBeInTheDocument();
+  });
+
+  it('offers reconnection when startup authentication fails with a login URL', async () => {
+    vi.spyOn(authClient, 'getAuthStatus').mockRejectedValue(new authClient.AppError(
+      'Your Spotify session expired. Reconnect to continue.',
+      { code: 'not_authenticated', status: 401, loginUrl: '/api/login' },
+    ));
+
+    render(<App />);
+
+    expect(await screen.findByText(/session expired/)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Connect Spotify' })).toHaveAttribute('href', '/api/login');
   });
 });

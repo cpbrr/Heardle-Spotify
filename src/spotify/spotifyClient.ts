@@ -82,6 +82,7 @@ export class SpotifyClient {
         throw new AppError('This Spotify account is not authorized for this development app. Add its Spotify email in Developer Dashboard > Users Management, then reconnect.', {
           code: 'spotify_account_not_allowed',
           status: 403,
+          loginUrl: '/api/login',
         });
       }
       if (response.status === 403 && /\/playlists\/[^/]+\/items/.test(path)) {
@@ -102,7 +103,7 @@ export class SpotifyClient {
         });
       }
 
-      throw new AppError(message, {
+      throw new AppError(message + ' (HTTP ' + response.status + ')', {
         code: response.status === 403 ? 'spotify_forbidden' : 'spotify_request_failed',
         status: response.status,
         retryable: response.status >= 500,

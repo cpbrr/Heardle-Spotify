@@ -65,6 +65,18 @@ describe('GameScreen interactions', () => {
     expect(changed?.attempts[0]).toEqual({ kind: 'incorrect', label: 'Outside Song - Artist' });
     expect(screen.getByRole('button', { name: 'Submit guess' })).toBeDisabled();
   });
+
+  it('disables Submit immediately when the selected guess text is edited', async () => {
+    const player = { activate: async () => undefined, playClip: async () => undefined, pause: async () => undefined };
+    const user = userEvent.setup();
+    render(<GameScreen round={createRound(tracks[0])} tracks={tracks} searchTracks={vi.fn().mockResolvedValue(tracks)} player={player} onRoundChange={vi.fn()} onRoundComplete={() => undefined} onAuthExpired={() => undefined} />);
+
+    await chooseGuess(tracks[0]);
+    expect(screen.getByRole('button', { name: 'Submit guess' })).toBeEnabled();
+    await user.type(screen.getByRole('combobox', { name: 'Guess' }), ' remix');
+
+    expect(screen.getByRole('button', { name: 'Submit guess' })).toBeDisabled();
+  });
 });
 
 

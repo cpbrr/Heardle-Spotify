@@ -11,6 +11,7 @@ export type TrackSearchFunction = (query: string, signal: AbortSignal) => Promis
 
 export interface TrackSearchProps {
   disabled?: boolean;
+  onClear?(): void;
   onSelect(track: Track): void;
   search?: TrackSearchFunction;
 }
@@ -19,6 +20,7 @@ type SearchState = 'idle' | 'loading' | 'ready' | 'error';
 
 export function TrackSearch({
   disabled = false,
+  onClear,
   onSelect,
   search = searchTracks,
 }: TrackSearchProps): React.JSX.Element {
@@ -67,6 +69,18 @@ export function TrackSearch({
     onSelect(track);
   }
 
+  function changeQuery(nextQuery: string) {
+    setQuery(nextQuery);
+    setResults([]);
+    setState('idle');
+    setError('');
+    setActiveIndex(-1);
+    if (selectedTrack) {
+      setSelectedTrack(null);
+      onClear?.();
+    }
+  }
+
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'ArrowDown' && results.length > 0) {
       event.preventDefault();
@@ -106,7 +120,7 @@ export function TrackSearch({
           disabled={disabled}
           placeholder="Search Spotify for your guess"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => changeQuery(event.target.value)}
           onKeyDown={handleKeyDown}
         />
       </label>

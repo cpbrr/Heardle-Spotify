@@ -83,7 +83,7 @@ describe('SpotifyClient', () => {
 
     await expect(client.request('/me/player')).rejects.toEqual(expect.objectContaining({
       code: 'spotify_forbidden',
-      message: 'Premium required',
+      message: 'Premium required (HTTP 403)',
       status: 403,
     } satisfies Partial<AppError>));
   });
@@ -94,6 +94,7 @@ describe('SpotifyClient', () => {
     await expect(client.request('/me')).rejects.toMatchObject({
       code: 'spotify_account_not_allowed',
       message: expect.stringContaining('Users Management'),
+      loginUrl: '/api/login',
     });
   });
 
@@ -111,8 +112,21 @@ describe('SpotifyClient', () => {
 
     await expect(client.request('/me')).rejects.toMatchObject({
       code: 'spotify_request_failed',
-      message: 'Spotify is temporarily unavailable.',
+      message: 'Spotify is temporarily unavailable. (HTTP 503)',
       retryable: true,
+    });
+  });
+
+  it.each([
+    [500, '', 'Spotify request failed. (HTTP 500)'],
+    [502, '<html>Bad gateway</html>', 'Spotify request failed. (HTTP 502)'],
+    [400, JSON.stringify({ error: { message: 'Malformed request' } }), 'Malformed request (HTTP 400)'],
+  ])('includes HTTP %s in ordinary Spotify failures', async (status, body, expectedMessage) => {
+    const client = clientReturning(new Response(body, { status }));
+
+    await expect(client.request('/search')).rejects.toMatchObject({
+      status,
+      message: expectedMessage,
     });
   });
 });

@@ -27,7 +27,7 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
       <ol aria-label="Attempts">{round.attempts.map((attempt, index) => <li key={index}>{attempt.kind === 'pending' ? 'Pending' : attempt.kind === 'skipped' ? 'Skipped' : attempt.label}</li>)}</ol>
       {error && <p role="alert">{error}</p>}
       <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-        <TrackSearch key={round.attemptIndex} disabled={disabled} onSelect={setSelectedGuess} search={searchTracks} />
+        <TrackSearch key={round.attemptIndex} disabled={disabled} onClear={() => setSelectedGuess(null)} onSelect={setSelectedGuess} search={searchTracks} />
         <button type="submit" disabled={disabled || !selectedGuess}>Submit guess</button>
       </form>
       <button type="button" disabled={disabled} onClick={() => void play()} aria-label={`Play ${seconds} second clip`}>Play {seconds} second clip</button>

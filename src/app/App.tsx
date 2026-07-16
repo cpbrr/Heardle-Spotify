@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 
-import { AppError, getAuthStatus } from '../auth/authClient';
+import { AppError, getAuthStatus, loginUrl } from '../auth/authClient';
 import { GameScreen } from '../components/GameScreen';
 import { LoginScreen } from '../components/LoginScreen';
 import { ConfigurationScreen } from '../components/ConfigurationScreen';
@@ -71,9 +71,12 @@ export function App() {
       focusController?.abort();
       const controller = new AbortController();
       focusController = controller;
-      void getAuthStatus(controller.signal).then((status) => {
+      void (async () => {
+        const status = await getAuthStatus(controller.signal);
         if (controller.signal.aborted || !mounted.current) return;
         if (!status.configured || !status.authenticated) return;
+        await validateSpotifyAccount(controller.signal);
+        if (controller.signal.aborted || !mounted.current || resumeContext.current !== resume) return;
         if (!player.current) player.current = new SpotifyPlayer();
         resumeContext.current = null;
         if (resume.type === 'load-source') {
@@ -84,16 +87,19 @@ export function App() {
         if (resume.type === 'play-clip') {
           setRound(resume.round);
           dispatch({ type: 'resumeRound', source: resume.source, tracks: resume.tracks });
-          void player.current?.activate().then(() => player.current?.playClip(resume.round.answer.uri, resume.round.clipLimitMs, () => undefined)).catch(() => undefined);
+          void player.current.activate().then(() => player.current?.playClip(resume.round.answer.uri, resume.round.clipLimitMs, () => undefined)).catch(() => undefined);
           return;
         }
-        if (resume.type === 'full-track') {
-          setRound(resume.round);
-          dispatch({ type: 'resumeResult', source: resume.source, tracks: resume.tracks, outcome: resume.outcome });
-          void player.current?.playFullTrack(resume.round.answer.uri).catch(() => undefined);
-          return;
-        }
-      }).catch(() => undefined);
+        setRound(resume.round);
+        dispatch({ type: 'resumeResult', source: resume.source, tracks: resume.tracks, outcome: resume.outcome });
+        void player.current.playFullTrack(resume.round.answer.uri).catch(() => undefined);
+      })().catch((error: unknown) => {
+        if (controller.signal.aborted || !mounted.current || resumeContext.current !== resume) return;
+        dispatch({
+          type: 'failed',
+          error: error instanceof AppError ? error : new AppError('Spotify account validation failed. Reconnect and try again.'),
+        });
+      });
     };
     window.addEventListener('focus', resumeAfterLogin);
     return () => {
@@ -199,7 +205,8 @@ export function App() {
     return <main className="loading-screen"><p className="wordmark">Heardle</p><StatusMessage>Loading {state.source.name}...</StatusMessage><button type="button" onClick={() => void changeSource()}>Change source</button></main>;
   }
   if (state.phase === 'error') {
-    return <main className="setup-screen"><p className="wordmark">Heardle</p><StatusMessage tone="error">{state.error.message}</StatusMessage></main>;
+    const reconnectUrl = state.error.loginUrl || (state.error.code === 'spotify_account_not_allowed' ? loginUrl : undefined);
+    return <main className="setup-screen"><p className="wordmark">Heardle</p><StatusMessage tone="error">{state.error.message}</StatusMessage>{reconnectUrl ? <a className="button button--primary" href={reconnectUrl}>Connect Spotify</a> : null}</main>;
   }
   if ((state.phase === 'ready' || state.phase === 'playing') && round && player.current) {
     return <><AppHeader onChangeSource={() => void changeSource()} /><GameScreen round={round} tracks={state.tracks} player={player.current} onRoundChange={setRound} onRoundComplete={(completed) => {

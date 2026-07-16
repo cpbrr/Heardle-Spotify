@@ -90,6 +90,25 @@ describe('TrackSearch', () => {
     expect(input).toHaveAttribute('aria-activedescendant');
   });
 
+  it('clears the selected track and stale results as soon as the query is edited', async () => {
+    const track = makeTrack('selected');
+    const onSelect = vi.fn();
+    const onClear = vi.fn();
+    const user = userEvent.setup();
+    render(<TrackSearch onSelect={onSelect} onClear={onClear} search={vi.fn().mockResolvedValue([track])} />);
+    const input = screen.getByRole('combobox', { name: 'Guess' });
+
+    await user.type(input, 'dreams');
+    await user.click(await screen.findByRole('option', { name: /dreams/i }));
+    expect(screen.getByText('Selected guess')).toBeVisible();
+
+    await user.type(input, ' live');
+
+    expect(onClear).toHaveBeenCalledOnce();
+    expect(screen.queryByText('Selected guess')).not.toBeInTheDocument();
+    expect(screen.queryByRole('option')).not.toBeInTheDocument();
+  });
+
   it('does not search while disabled', async () => {
     const search = vi.fn();
     render(<TrackSearch disabled onSelect={vi.fn()} search={search} />);

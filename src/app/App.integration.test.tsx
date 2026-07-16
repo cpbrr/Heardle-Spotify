@@ -87,9 +87,11 @@ async function chooseGuess(track: Track) {
 
 describe('App game workflow', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mocks.getAuthStatus.mockResolvedValue(authStatus);
     mocks.validateSpotifyAccount.mockResolvedValue(undefined);
+    mocks.loadRecentTrackIds.mockReturnValue([]);
+    mocks.sourceKey.mockReturnValue('top');
     mocks.SpotifyPlayer.mockImplementation(function PlayerDouble() { return mocks.player; });
     mocks.searchTracks.mockResolvedValue(tracks);
     mocks.player.connect.mockResolvedValue('device-1');
@@ -163,6 +165,43 @@ describe('App game workflow', () => {
     expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
     expect(mocks.loadCatalog).toHaveBeenCalledTimes(2);
     expect(mocks.loadCatalog.mock.calls[1][0]).toEqual(source);
+  });
+
+  it('validates the Spotify account before resuming an interrupted catalog request', async () => {
+    const validation = deferred<void>();
+    mocks.loadCatalog.mockRejectedValueOnce(new AppError('Session expired.', { status: 401, code: 'spotify_authentication_error' })).mockResolvedValueOnce({ tracks, exclusions: { duplicates: 0, unavailable: 0, unsupported: 0 } });
+    mocks.getAuthStatus.mockResolvedValueOnce(authStatus).mockResolvedValueOnce({ ...authStatus, authenticated: false }).mockResolvedValueOnce(authStatus);
+    mocks.validateSpotifyAccount.mockResolvedValueOnce(undefined).mockReturnValueOnce(validation.promise);
+    render(<App />);
+
+    await chooseTopTracks();
+    await screen.findByRole('link', { name: 'Connect Spotify' });
+    window.dispatchEvent(new Event('focus'));
+    await vi.waitFor(() => expect(mocks.validateSpotifyAccount).toHaveBeenCalledTimes(2));
+
+    expect(mocks.loadCatalog).toHaveBeenCalledTimes(1);
+    await act(async () => validation.resolve());
+    expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
+    expect(mocks.loadCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not resume when account validation rejects the returning account', async () => {
+    mocks.loadCatalog.mockRejectedValueOnce(new AppError('Session expired.', { status: 401, code: 'spotify_authentication_error' })).mockResolvedValueOnce({ tracks, exclusions: { duplicates: 0, unavailable: 0, unsupported: 0 } });
+    mocks.getAuthStatus.mockResolvedValueOnce(authStatus).mockResolvedValueOnce({ ...authStatus, authenticated: false }).mockResolvedValueOnce(authStatus);
+    mocks.validateSpotifyAccount
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new AppError('Add this account in Users Management, then reconnect.', {
+        code: 'spotify_account_not_allowed', status: 403, loginUrl: '/api/login',
+      }));
+    render(<App />);
+
+    await chooseTopTracks();
+    await screen.findByRole('link', { name: 'Connect Spotify' });
+    window.dispatchEvent(new Event('focus'));
+
+    expect(await screen.findByText(/Users Management/)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Connect Spotify' })).toHaveAttribute('href', '/api/login');
+    expect(mocks.loadCatalog).toHaveBeenCalledTimes(1);
   });
 
   it('does not reset an active game when focus changes without an interrupted action', async () => {

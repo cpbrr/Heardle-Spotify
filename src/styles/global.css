@@ -53,6 +53,51 @@ main { padding-block: 1.5rem 3rem; }
 .button--primary { background: var(--accent); color: #08120c; border-color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .status-message--error, [role="alert"] { color: var(--danger); }
 
+.track-search {
+  display: grid;
+  gap: .75rem;
+}
+
+.track-search__feedback {
+  display: grid;
+  justify-items: start;
+  gap: .5rem;
+}
+
+.track-search__results {
+  max-height: min(22rem, 50vh);
+  overflow-y: auto;
+}
+
+.track-search__result[aria-selected="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-raised));
+}
+
+.track-search__metadata,
+.track-search__selection {
+  display: grid;
+  gap: .2rem;
+  min-width: 0;
+}
+
+.track-search__metadata strong,
+.track-search__metadata small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-search__metadata small {
+  color: var(--muted);
+}
+
+.track-search__selection {
+  padding: .75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
 @media (max-width: 520px) {
   main, .app-header { width: min(calc(100% - 24px), var(--content)); }
   main { padding-block: 1rem 2rem; }

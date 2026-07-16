@@ -12,6 +12,37 @@ interface SpotifyClientDependencies {
   fetchImpl?: typeof fetch;
 }
 
+export interface SpotifyApiClient {
+  request<T = unknown>(path: string, options?: RequestInit): Promise<T>;
+}
+
+type SpotifyErrorPayload = {
+  error?: { message?: string } | string;
+  message?: string;
+};
+
+function parseResponseBody(text: string): unknown {
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function spotifyErrorMessage(payload: unknown) {
+  if (typeof payload === 'string') {
+    const message = payload.trim();
+    return message && !message.startsWith('<') ? message : undefined;
+  }
+  if (!payload || typeof payload !== 'object') return undefined;
+  const errorPayload = payload as SpotifyErrorPayload;
+  const nestedMessage = typeof errorPayload.error === 'object'
+    ? errorPayload.error.message
+    : errorPayload.error;
+  return nestedMessage || errorPayload.message;
+}
+
 export class SpotifyClient {
   private readonly getToken: TokenProvider;
   private readonly fetchImpl: typeof fetch;
@@ -44,14 +75,23 @@ export class SpotifyClient {
       return undefined as T;
     }
 
-    const payload = await response.json().catch(() => ({})) as {
-      error?: { message?: string } | string;
-      message?: string;
-    };
+    const payload = parseResponseBody(await response.text());
 
     if (!response.ok) {
-      const nestedMessage = typeof payload.error === 'object' ? payload.error.message : payload.error;
-      const message = nestedMessage || payload.message || 'Spotify request failed.';
+      if (response.status === 403 && path === '/me') {
+        throw new AppError('This Spotify account is not authorized for this development app. Add its Spotify email in Developer Dashboard > Users Management, then reconnect.', {
+          code: 'spotify_account_not_allowed',
+          status: 403,
+        });
+      }
+      if (response.status === 403 && /\/playlists\/[^/]+\/items/.test(path)) {
+        throw new AppError('Spotify only allows playlists you own or collaborate on.', {
+          code: 'spotify_playlist_inaccessible',
+          status: 403,
+        });
+      }
+
+      const message = spotifyErrorMessage(payload) || 'Spotify request failed.';
       if (response.status === 429) {
         const retryAfter = Number(response.headers.get('Retry-After') || 1);
         throw new AppError(message, {

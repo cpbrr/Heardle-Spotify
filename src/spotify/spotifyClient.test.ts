@@ -10,6 +10,13 @@ function jsonResponse(status: number, body: unknown, headers?: HeadersInit) {
   });
 }
 
+function clientReturning(response: Response) {
+  return new SpotifyClient({
+    getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
+    fetchImpl: vi.fn().mockResolvedValue(response),
+  });
+}
+
 describe('SpotifyClient', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -79,5 +86,33 @@ describe('SpotifyClient', () => {
       message: 'Premium required',
       status: 403,
     } satisfies Partial<AppError>));
+  });
+
+  it('explains an empty development-mode 403 from account validation', async () => {
+    const client = clientReturning(new Response(null, { status: 403 }));
+
+    await expect(client.request('/me')).rejects.toMatchObject({
+      code: 'spotify_account_not_allowed',
+      message: expect.stringContaining('Users Management'),
+    });
+  });
+
+  it('explains playlist ownership restrictions', async () => {
+    const client = clientReturning(new Response(null, { status: 403 }));
+
+    await expect(client.request('/playlists/id/items?limit=50')).rejects.toMatchObject({
+      code: 'spotify_playlist_inaccessible',
+      message: expect.stringContaining('own or collaborate'),
+    });
+  });
+
+  it('preserves a safe plain-text Spotify failure message', async () => {
+    const client = clientReturning(new Response('Spotify is temporarily unavailable.', { status: 503 }));
+
+    await expect(client.request('/me')).rejects.toMatchObject({
+      code: 'spotify_request_failed',
+      message: 'Spotify is temporarily unavailable.',
+      retryable: true,
+    });
   });
 });

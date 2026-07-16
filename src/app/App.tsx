@@ -11,6 +11,7 @@ import { createRound, selectRoundTrack, type Round } from '../game/gameEngine';
 import { SpotifyPlayer } from '../player/SpotifyPlayer';
 import { loadCatalog } from '../sources/catalog';
 import { loadRecentTrackIds, loadStreak, saveRecentTrackIds, saveSource, saveStreak, sourceKey } from '../sources/sourceStorage';
+import { validateSpotifyAccount } from '../spotify/account';
 import type { SourceDescriptor, Track } from '../spotify/types';
 import { appReducer, initialAppState } from './appReducer';
 
@@ -41,10 +42,13 @@ export function App() {
     const controller = new AbortController();
     mounted.current = true;
     void getAuthStatus(controller.signal)
-      .then((status) => {
+      .then(async (status) => {
         if (status.configured && status.authenticated && !player.current) {
+          await validateSpotifyAccount(controller.signal);
+          if (controller.signal.aborted || !mounted.current) return;
           player.current = new SpotifyPlayer();
         }
+        if (controller.signal.aborted || !mounted.current) return;
         dispatch({ type: 'authChecked', status });
       })
       .catch((error) => {

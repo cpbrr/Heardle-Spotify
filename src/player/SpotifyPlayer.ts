@@ -1,4 +1,5 @@
 import { AppError, getAccessToken } from '../auth/authClient';
+import { SPOTIFY_PREMIUM_REQUIRED_MESSAGE } from '../spotify/account';
 import type { SpotifyNamespace, SpotifySdkPlayer } from './spotify-sdk';
 
 const SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
@@ -134,7 +135,9 @@ export class SpotifyPlayer {
         finish(() => reject(this.sdkError('Spotify authentication expired.', 'spotify_authentication_error', value)));
       });
       player.addListener('account_error', (value) => {
-        finish(() => reject(this.sdkError('Spotify Premium is required for playback.', 'spotify_account_error', value)));
+        finish(() => reject(new AppError(SPOTIFY_PREMIUM_REQUIRED_MESSAGE, {
+          code: 'spotify_premium_required',
+        })));
       });
       player.addListener('initialization_error', (value) => {
         finish(() => reject(this.sdkError('Spotify playback could not initialize.', 'spotify_initialization_error', value)));

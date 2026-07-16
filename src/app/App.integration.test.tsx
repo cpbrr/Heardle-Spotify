@@ -8,6 +8,7 @@ import { App } from './App';
 
 const mocks = vi.hoisted(() => ({
   getAuthStatus: vi.fn(),
+  validateSpotifyAccount: vi.fn(),
   loadCatalog: vi.fn(),
   searchTracks: vi.fn(),
   player: {
@@ -30,6 +31,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../auth/authClient', async (importOriginal) => ({
   ...await importOriginal<typeof import('../auth/authClient')>(),
   getAuthStatus: mocks.getAuthStatus,
+}));
+vi.mock('../spotify/account', () => ({
+  validateSpotifyAccount: mocks.validateSpotifyAccount,
 }));
 vi.mock('../sources/catalog', async (importOriginal) => ({
   ...await importOriginal<typeof import('../sources/catalog')>(),
@@ -85,6 +89,7 @@ describe('App game workflow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getAuthStatus.mockResolvedValue(authStatus);
+    mocks.validateSpotifyAccount.mockResolvedValue(undefined);
     mocks.SpotifyPlayer.mockImplementation(function PlayerDouble() { return mocks.player; });
     mocks.searchTracks.mockResolvedValue(tracks);
     mocks.player.connect.mockResolvedValue('device-1');

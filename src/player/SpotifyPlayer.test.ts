@@ -126,6 +126,25 @@ describe('SpotifyPlayer', () => {
     await expectation;
   });
 
+  it('maps SDK account errors to the actionable Premium error', async () => {
+    const sdkPlayer = new SdkPlayerDouble();
+    sdkPlayer.connect.mockImplementation(async () => {
+      sdkPlayer.listeners.get('account_error')?.({ message: 'Account error' });
+      return false;
+    });
+    const player = new SpotifyPlayer({
+      getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
+      fetchImpl: vi.fn(),
+      loadSdk: vi.fn().mockResolvedValue(playerNamespace(sdkPlayer)),
+    });
+
+    await expect(player.connect()).rejects.toMatchObject({
+      code: 'spotify_premium_required',
+      message: 'Spotify Premium is required for playback.',
+      retryable: false,
+    });
+  });
+
   it('clears timers and disconnects the SDK on destroy', async () => {
     const sdkPlayer = new SdkPlayerDouble();
     const fetchImpl = vi.fn().mockResolvedValue(successfulResponse());

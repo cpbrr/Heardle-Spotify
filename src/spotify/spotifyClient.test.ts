@@ -98,12 +98,14 @@ describe('SpotifyClient', () => {
     });
   });
 
-  it('explains playlist ownership restrictions', async () => {
+  it('reconnects Spotify for playlist authorization or ownership restrictions', async () => {
     const client = clientReturning(new Response(null, { status: 403 }));
 
     await expect(client.request('/playlists/id/items?limit=50')).rejects.toMatchObject({
-      code: 'spotify_playlist_inaccessible',
-      message: expect.stringContaining('own or collaborate'),
+      code: 'spotify_playlist_access_required',
+      status: 403,
+      loginUrl: '/api/login',
+      message: 'Reconnect Spotify to grant playlist access. Spotify only allows playlists you own or collaborate on.',
     });
   });
 

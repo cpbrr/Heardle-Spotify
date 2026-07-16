@@ -86,10 +86,14 @@ export class SpotifyClient {
         });
       }
       if (response.status === 403 && /\/playlists\/[^/]+\/items/.test(path)) {
-        throw new AppError('Spotify only allows playlists you own or collaborate on.', {
-          code: 'spotify_playlist_inaccessible',
-          status: 403,
-        });
+        throw new AppError(
+          'Reconnect Spotify to grant playlist access. Spotify only allows playlists you own or collaborate on.',
+          {
+            code: 'spotify_playlist_access_required',
+            status: 403,
+            loginUrl: '/api/login',
+          },
+        );
       }
 
       const message = spotifyErrorMessage(payload) || 'Spotify request failed.';

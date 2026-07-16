@@ -143,6 +143,21 @@ describe('App game workflow', () => {
     expect(mocks.getAuthStatus).toHaveBeenCalledTimes(2);
   });
 
+  it('offers Spotify reconnection when playlist access authorization is missing', async () => {
+    const message = 'Reconnect Spotify to grant playlist access. Spotify only allows playlists you own or collaborate on.';
+    mocks.loadCatalog.mockRejectedValue(new AppError(message, {
+      code: 'spotify_playlist_access_required',
+      status: 403,
+      loginUrl: '/api/login',
+    }));
+    render(<App />);
+
+    await chooseTopTracks();
+
+    expect(await screen.findByText(message)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Connect Spotify' })).toHaveAttribute('href', '/api/login');
+  });
+
   it('destroys its single player instance when the app unmounts', async () => {
     mocks.loadCatalog.mockReturnValue(deferred<never>().promise);
     const view = render(<App />);

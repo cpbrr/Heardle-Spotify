@@ -42,21 +42,28 @@ describe('GameScreen clip controls', () => {
   });
 });
 import userEvent from '@testing-library/user-event';
+async function chooseGuess(track: Track) {
+  await userEvent.type(screen.getByRole('combobox', { name: 'Guess' }), track.title);
+  await userEvent.click(await screen.findByRole('option', { name: new RegExp(track.title, 'i') }));
+}
+
 
 describe('GameScreen interactions', () => {
-  it('activates before playback and submits a catalog-derived wrong guess', async () => {
+  it('activates before playback and submits a globally searched track that is absent from the answer catalog', async () => {
     const calls: string[] = [];
     let changed: ReturnType<typeof createRound> | undefined;
+    const outsideTrack = { ...tracks[0], id: 'outside', title: 'Outside Song' };
     const player = { activate: async () => { calls.push('activate'); }, playClip: async () => { calls.push('play'); }, pause: async () => undefined };
     const user = userEvent.setup();
-    render(<GameScreen round={createRound(tracks[0])} tracks={[...tracks, { ...tracks[0], id: 'other', title: 'Other Song' }]} player={player} onRoundChange={(round) => { changed = round; }} onRoundComplete={() => undefined} onAuthExpired={() => undefined} />);
+    render(<GameScreen round={createRound(tracks[0])} tracks={tracks} searchTracks={vi.fn().mockResolvedValue([outsideTrack])} player={player} onRoundChange={(round) => { changed = round; }} onRoundComplete={() => undefined} onAuthExpired={() => undefined} />);
 
     await user.click(screen.getByRole('button', { name: 'Play 1 second clip' }));
     expect(calls).toEqual(['activate', 'play']);
-    await user.selectOptions(screen.getByLabelText('Guess'), 'other');
+    await chooseGuess(outsideTrack);
     await user.click(screen.getByRole('button', { name: 'Submit guess' }));
     expect(changed).toMatchObject({ attemptIndex: 1 });
-    expect(changed?.attempts[0]).toEqual({ kind: 'incorrect', label: 'Other Song - Artist' });
+    expect(changed?.attempts[0]).toEqual({ kind: 'incorrect', label: 'Outside Song - Artist' });
+    expect(screen.getByRole('button', { name: 'Submit guess' })).toBeDisabled();
   });
 });
 
@@ -85,12 +92,12 @@ describe('GameScreen completion interactions', () => {
     expect(changed?.attempts[0]).toEqual({ kind: 'skipped' });
   });
 
-  it('clicks a correct catalog guess and completes the round', async () => {
+  it('clicks a correct global search result and completes the round', async () => {
     let completed = 0;
     let changed: ReturnType<typeof createRound> | undefined;
     const user = userEvent.setup();
-    render(<GameScreen round={createRound(tracks[0])} tracks={tracks} player={{ activate: async () => undefined, playClip: async () => undefined, pause: async () => undefined }} onRoundChange={(round) => { changed = round; }} onRoundComplete={() => { completed += 1; }} onAuthExpired={() => undefined} />);
-    await user.selectOptions(screen.getByLabelText('Guess'), 'answer');
+    render(<GameScreen round={createRound(tracks[0])} tracks={tracks} searchTracks={vi.fn().mockResolvedValue(tracks)} player={{ activate: async () => undefined, playClip: async () => undefined, pause: async () => undefined }} onRoundChange={(round) => { changed = round; }} onRoundComplete={() => { completed += 1; }} onAuthExpired={() => undefined} />);
+    await chooseGuess(tracks[0]);
     await user.click(screen.getByRole('button', { name: 'Submit guess' }));
     expect(changed?.status).toBe('won');
     expect(completed).toBe(1);
@@ -102,9 +109,9 @@ describe('GameScreen completion interactions', () => {
     let completed = 0;
     let changed: ReturnType<typeof createRound> | undefined;
     const user = userEvent.setup();
-    render(<GameScreen round={createRound(tracks[0])} tracks={tracks} player={{ activate: async () => undefined, playClip: async () => undefined, pause: pausePlayback }} onRoundChange={(round) => { changed = round; }} onRoundComplete={() => { completed += 1; }} onAuthExpired={() => undefined} />);
+    render(<GameScreen round={createRound(tracks[0])} tracks={tracks} searchTracks={vi.fn().mockResolvedValue(tracks)} player={{ activate: async () => undefined, playClip: async () => undefined, pause: pausePlayback }} onRoundChange={(round) => { changed = round; }} onRoundComplete={() => { completed += 1; }} onAuthExpired={() => undefined} />);
 
-    await user.selectOptions(screen.getByLabelText('Guess'), 'answer');
+    await chooseGuess(tracks[0]);
     await user.click(screen.getByRole('button', { name: 'Submit guess' }));
     expect(pausePlayback).toHaveBeenCalledTimes(1);
     expect(changed).toBeUndefined();

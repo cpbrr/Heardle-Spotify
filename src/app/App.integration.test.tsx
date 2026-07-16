@@ -9,6 +9,7 @@ import { App } from './App';
 const mocks = vi.hoisted(() => ({
   getAuthStatus: vi.fn(),
   loadCatalog: vi.fn(),
+  searchTracks: vi.fn(),
   player: {
     connect: vi.fn(),
     activate: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('../auth/authClient', async (importOriginal) => ({
 vi.mock('../sources/catalog', async (importOriginal) => ({
   ...await importOriginal<typeof import('../sources/catalog')>(),
   loadCatalog: mocks.loadCatalog,
+  searchTracks: mocks.searchTracks,
 }));
 vi.mock('../sources/sourceStorage', async (importOriginal) => ({
   ...await importOriginal<typeof import('../sources/sourceStorage')>(),
@@ -73,12 +75,18 @@ async function chooseTopTracks() {
 async function chooseLikedSongs() {
   await userEvent.click(await screen.findByRole('button', { name: /My liked songs/ }));
 }
+async function chooseGuess(track: Track) {
+  await userEvent.type(screen.getByRole('combobox', { name: 'Guess' }), track.title);
+  await userEvent.click(await screen.findByRole('option', { name: new RegExp(track.title, 'i') }));
+}
+
 
 describe('App game workflow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getAuthStatus.mockResolvedValue(authStatus);
     mocks.SpotifyPlayer.mockImplementation(function PlayerDouble() { return mocks.player; });
+    mocks.searchTracks.mockResolvedValue(tracks);
     mocks.player.connect.mockResolvedValue('device-1');
     mocks.player.activate.mockResolvedValue(undefined);
     mocks.player.playClip.mockResolvedValue(undefined);
@@ -217,7 +225,7 @@ describe('App game workflow', () => {
     render(<App />);
 
     await chooseTopTracks();
-    await user.selectOptions(await screen.findByLabelText('Guess'), 'track-1');
+    await chooseGuess(tracks[0]);
     await user.click(screen.getByRole('button', { name: 'Submit guess' }));
     await user.click(await screen.findByRole('button', { name: 'Play full track' }));
     await screen.findByRole('link', { name: 'Connect Spotify' });
@@ -254,7 +262,7 @@ describe('App game workflow', () => {
       screen.getByRole('button', { name: 'Change source' }),
     );
 
-    await user.selectOptions(screen.getByLabelText('Guess'), 'track-1');
+    await chooseGuess(tracks[0]);
     await user.click(screen.getByRole('button', { name: 'Submit guess' }));
     expect(await screen.findByRole('button', { name: 'Play full track' })).toBeVisible();
     expect(screen.getByRole('banner')).toContainElement(
@@ -269,7 +277,7 @@ describe('App game workflow', () => {
     render(<App />);
 
     await chooseTopTracks();
-    await user.selectOptions(await screen.findByLabelText('Guess'), 'track-1');
+    await chooseGuess(tracks[0]);
     await user.click(screen.getByRole('button', { name: 'Submit guess' }));
     expect(await screen.findByRole('button', { name: 'Play full track' })).toBeVisible();
     expect(mocks.saveStreak).toHaveBeenCalledWith(5);

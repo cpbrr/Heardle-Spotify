@@ -75,7 +75,8 @@ export function getAccessToken(signal?: AbortSignal, forceRefresh = false): Prom
   }
 
   if (!tokenRequest) {
-    tokenRequest = requestJson<TokenResult>('/api/token', { signal })
+    const tokenUrl = forceRefresh ? '/api/token?force=1' : '/api/token';
+    tokenRequest = requestJson<TokenResult>(tokenUrl, { signal })
       .then((token) => {
         cachedToken = token;
         return token;

@@ -23,11 +23,12 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  const force = new URL(req.url, config.origin).searchParams.get('force') === '1';
   const cookies = parseCookies(req);
   const accessToken = cookies.spotify_access_token;
   const refreshToken = cookies.spotify_refresh_token;
   const expiresAt = Number(cookies.spotify_token_expires_at || 0);
-  const stillFresh = accessToken && expiresAt && Date.now() < expiresAt - 60 * 1000;
+  const stillFresh = !force && accessToken && expiresAt && Date.now() < expiresAt - 60 * 1000;
 
   if (stillFresh) {
     sendJson(res, 200, { accessToken, expiresAt });

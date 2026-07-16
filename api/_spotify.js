@@ -11,6 +11,8 @@ const SCOPES = [
   'streaming',
   'user-read-playback-state',
   'user-library-read',
+  'playlist-read-private',
+  'playlist-read-collaborative',
 ];
 
 function getConfig(req) {

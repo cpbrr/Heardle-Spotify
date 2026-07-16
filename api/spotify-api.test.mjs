@@ -10,9 +10,11 @@ const token = require('./token.js');
 const { serializeCookie } = require('./_spotify.js');
 
 const originalEnv = { ...process.env };
+const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   process.env = { ...originalEnv };
+  globalThis.fetch = originalFetch;
 });
 
 function request(overrides = {}) {
@@ -56,6 +58,31 @@ function clearSpotifyConfig() {
 }
 
 describe('Spotify API contracts', () => {
+  it('requests private and collaborative playlist scopes during login', () => {
+    process.env.SPOTIFY_CLIENT_ID = 'client';
+    process.env.SPOTIFY_CLIENT_SECRET = 'secret';
+    const res = response();
+
+    login(request({ url: '/api/login' }), res);
+
+    const location = res.getHeader('location');
+    const authorizeUrl = new URL(location);
+    assert.equal(res.statusCode, 302);
+    assert.equal(authorizeUrl.searchParams.get('scope'), [
+      'user-top-read',
+      'user-read-private',
+      'user-read-email',
+      'app-remote-control',
+      'user-modify-playback-state',
+      'streaming',
+      'user-read-playback-state',
+      'user-library-read',
+      'playlist-read-private',
+      'playlist-read-collaborative',
+    ].join(' '));
+    assert.match(location, /playlist-read-private\+playlist-read-collaborative/);
+  });
+
   it('returns an actionable 503 when login credentials are missing', () => {
     clearSpotifyConfig();
     const res = response();
@@ -85,6 +112,38 @@ describe('Spotify API contracts', () => {
       retryable: false,
       loginUrl: '/api/login',
     });
+  });
+
+  it('force refresh bypasses a nominally fresh rejected access token', async () => {
+    process.env.SPOTIFY_CLIENT_ID = 'client';
+    process.env.SPOTIFY_CLIENT_SECRET = 'secret';
+    const refreshCalls = [];
+    globalThis.fetch = async (url, options) => {
+      refreshCalls.push([url, options]);
+      return new Response(JSON.stringify({
+        access_token: 'refreshed-access-token',
+        expires_in: 3600,
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+    const res = response();
+    const freshTokenCookies = [
+      'spotify_access_token=rejected-access-token',
+      'spotify_refresh_token=refresh-token',
+      'spotify_token_expires_at=' + (Date.now() + 3_600_000),
+    ].join('; ');
+
+    await token(request({
+      url: '/api/token?force=1',
+      headers: { host: 'localhost:3000', cookie: freshTokenCookies },
+    }), res);
+
+    assert.equal(refreshCalls.length, 1);
+    assert.equal(refreshCalls[0][0], 'https://accounts.spotify.com/api/token');
+    assert.equal(refreshCalls[0][1].body, 'grant_type=refresh_token&refresh_token=refresh-token');
+    assert.equal(jsonBody(res).accessToken, 'refreshed-access-token');
   });
 
   it('rejects unsupported logout methods without clearing cookies', () => {

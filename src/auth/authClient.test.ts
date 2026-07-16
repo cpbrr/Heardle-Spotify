@@ -64,6 +64,18 @@ describe('authClient', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('propagates a forced refresh after Spotify rejects a cached token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {
+      accessToken: 'fresh',
+      expiresAt: Date.now() + 3_600_000,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getAccessToken(undefined, true);
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/token?force=1', expect.objectContaining({ signal: undefined }));
+  });
+
   it('clears the token cache when logging out', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse(200, {

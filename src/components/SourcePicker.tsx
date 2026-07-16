@@ -64,6 +64,7 @@ export function SourcePicker({ onSelect, onClose, search = searchSources }: Sour
 
     const controller = new AbortController();
     setState('loading');
+    setResults([]);
     setError('');
     setSelectedIndex(-1);
     void search(activeKind, debouncedQuery.trim(), controller.signal)

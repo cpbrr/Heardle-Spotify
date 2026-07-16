@@ -62,7 +62,7 @@ const authStatus = {
 const source: SourceDescriptor = { kind: 'top', name: 'My top tracks', imageUrl: null };
 const tracks: Track[] = [{
   id: 'track-1', uri: 'spotify:track:track-1', title: 'One Song', artists: ['One Artist'],
-  artistText: 'One Artist', durationMs: 180000, album: 'One Album', imageUrl: null,
+  artistText: 'One Artist', durationMs: 180000, album: 'One Album', imageUrl: 'https://images.test/one-song.jpg',
 }];
 
 function deferred<T>() {
@@ -309,6 +309,10 @@ describe('App game workflow', () => {
     await chooseGuess(tracks[0]);
     await user.click(screen.getByRole('button', { name: 'Submit guess' }));
     expect(await screen.findByRole('button', { name: 'Play full track' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'One Song album cover' })).toHaveAttribute(
+      'src',
+      'https://images.test/one-song.jpg',
+    );
     expect(screen.getByRole('banner')).toContainElement(
       screen.getByRole('button', { name: 'Change source' }),
     );

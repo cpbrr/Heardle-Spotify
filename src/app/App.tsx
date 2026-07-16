@@ -217,7 +217,7 @@ export function App() {
     }} onAuthExpired={(error) => void recoverPlayback(error)} /></>;
   }
   if (state.phase === 'round-complete' && round && player.current) {
-    return <><AppHeader onChangeSource={() => void changeSource()} /><main className="game-screen"><ResultView outcome={state.outcome} title={round.answer.title} artist={round.answer.artistText} onPlayFullTrack={() => void (async () => {
+    return <><AppHeader onChangeSource={() => void changeSource()} /><main className="game-screen"><ResultView outcome={state.outcome} title={round.answer.title} artist={round.answer.artistText} imageUrl={round.answer.imageUrl} onPlayFullTrack={() => void (async () => {
       try {
         await player.current?.playFullTrack(round.answer.uri);
       } catch (error) {

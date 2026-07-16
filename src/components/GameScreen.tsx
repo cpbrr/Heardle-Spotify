@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Round } from '../game/gameEngine';
-import { skipAttempt, submitGuess } from '../game/gameEngine';
+import { giveUp, skipAttempt, submitGuess } from '../game/gameEngine';
 import { AppError } from '../auth/authClient';
 import type { Track } from '../spotify/types';
 import { TrackSearch } from './TrackSearch';
@@ -19,6 +19,7 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
   const play = async () => { setError(null); try { await player.activate(); await player.playClip(round.answer.uri, round.clipLimitMs, () => undefined); } catch (failure) { recover(failure); } };
   const update = (next: Round) => { onRoundChange?.(next); if (next.status !== 'playing') onRoundComplete?.(next); };
   const skip = async () => { setError(null); try { await player.pause(); const next = skipAttempt(round); if (next.status === 'playing') setSelectedGuess(null); update(next); } catch (failure) { recover(failure); } };
+  const skipSong = async () => { setError(null); try { await player.pause(); update(giveUp(round)); } catch (failure) { recover(failure); } };
   const submit = async () => { if (!selectedGuess) return; const next = submitGuess(round, { trackId: selectedGuess.id, label: `${selectedGuess.title} - ${selectedGuess.artistText}` }); try { if (next.status !== 'playing') await player.pause(); else setSelectedGuess(null); update(next); } catch (failure) { recover(failure); } };
   const seconds = Math.round(round.clipLimitMs / 1000);
   const disabled = round.status !== 'playing';
@@ -32,6 +33,7 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
       </form>
       <button type="button" disabled={disabled} onClick={() => void play()} aria-label={`Play ${seconds} second clip`}>Play {seconds} second clip</button>
       <button type="button" disabled={disabled} onClick={() => void skip()}>Skip +1s</button>
+      <button type="button" disabled={disabled} onClick={() => void skipSong()}>Skip song</button>
     </main>
   );
 }

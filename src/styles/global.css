@@ -45,7 +45,7 @@ main { padding-block: 1.5rem 3rem; }
 .search-field { min-height: 44px; display: flex; align-items: center; gap: .5rem; border: 1px solid var(--border); border-radius: var(--radius); padding-inline: .75rem; }
 .search-field input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); }
 .search-result { display: flex; align-items: center; gap: .75rem; text-align: left; }
-.artwork { width: min(100%, 18rem); margin-inline: auto; aspect-ratio: 1; }
+.artwork { width: min(100%, 18rem); margin-inline: auto; aspect-ratio: 1; object-fit: cover; }
 .search-result img, .artwork-placeholder { width: 48px; height: 48px; aspect-ratio: 1; object-fit: cover; flex: 0 0 auto; background: var(--surface-raised); }
 .config-value { display: flex; align-items: center; gap: .5rem; min-width: 0; padding: .5rem; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius); }
 .config-value code { min-width: 0; overflow-wrap: anywhere; }

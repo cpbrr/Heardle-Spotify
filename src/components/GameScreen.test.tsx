@@ -95,6 +95,24 @@ describe('GameScreen playback failures', () => {
 
 
 describe('GameScreen completion interactions', () => {
+  it('pauses playback before Skip song immediately completes the round as a loss', async () => {
+    const pause = deferred<void>();
+    const pausePlayback = vi.fn(() => pause.promise);
+    const onRoundChange = vi.fn();
+    const onRoundComplete = vi.fn();
+    const user = userEvent.setup();
+    render(<GameScreen round={createRound(tracks[0])} tracks={tracks} player={{ activate: async () => undefined, playClip: async () => undefined, pause: pausePlayback }} onRoundChange={onRoundChange} onRoundComplete={onRoundComplete} onAuthExpired={() => undefined} />);
+
+    await user.click(screen.getByRole('button', { name: 'Skip song' }));
+    expect(pausePlayback).toHaveBeenCalledTimes(1);
+    expect(onRoundChange).not.toHaveBeenCalled();
+    expect(onRoundComplete).not.toHaveBeenCalled();
+
+    pause.resolve();
+    await vi.waitFor(() => expect(onRoundComplete).toHaveBeenCalledTimes(1));
+    expect(onRoundChange).toHaveBeenCalledWith(expect.objectContaining({ status: 'lost' }));
+    expect(onRoundComplete).toHaveBeenCalledWith(expect.objectContaining({ status: 'lost' }));
+  });
   it('clicks Skip and emits the next skipped attempt', async () => {
     let changed: ReturnType<typeof createRound> | undefined;
     const user = userEvent.setup();
@@ -182,6 +200,21 @@ describe('GameScreen auth failures', () => {
     render(<GameScreen round={createRound(tracks[0])} tracks={tracks} player={{ activate: async () => { throw new AppError('Expired', { status: 401, code: 'spotify_authentication_error' }); }, playClip: async () => undefined, pause: async () => undefined }} onRoundChange={() => undefined} onRoundComplete={() => undefined} onAuthExpired={() => { recovered += 1; }} />);
     await user.click(screen.getByRole('button', { name: 'Play 1 second clip' }));
     expect(recovered).toBe(1);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+  it('does not lose the round when Skip song pause fails with an authentication error', async () => {
+    const authenticationError = new AppError('Expired', { status: 401, code: 'spotify_authentication_error' });
+    const onRoundChange = vi.fn();
+    const onRoundComplete = vi.fn();
+    const onAuthExpired = vi.fn();
+    const user = userEvent.setup();
+    render(<GameScreen round={createRound(tracks[0])} tracks={tracks} player={{ activate: async () => undefined, playClip: async () => undefined, pause: vi.fn().mockRejectedValue(authenticationError) }} onRoundChange={onRoundChange} onRoundComplete={onRoundComplete} onAuthExpired={onAuthExpired} />);
+
+    await user.click(screen.getByRole('button', { name: 'Skip song' }));
+
+    expect(onRoundChange).not.toHaveBeenCalled();
+    expect(onRoundComplete).not.toHaveBeenCalled();
+    expect(onAuthExpired).toHaveBeenCalledWith(authenticationError);
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });

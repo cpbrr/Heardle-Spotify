@@ -18,7 +18,7 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
   const recover = (failure: unknown) => { if (isAuthenticationError(failure)) onAuthExpired?.(failure); else setError(failure instanceof Error ? failure.message : 'Playback failed.'); };
   const play = async () => { setError(null); try { await player.activate(); await player.playClip(round.answer.uri, round.clipLimitMs, () => undefined); } catch (failure) { recover(failure); } };
   const update = (next: Round) => { onRoundChange?.(next); if (next.status !== 'playing') onRoundComplete?.(next); };
-  const skip = async () => { setError(null); try { await player.pause(); update(skipAttempt(round)); } catch (failure) { recover(failure); } };
+  const skip = async () => { setError(null); try { await player.pause(); const next = skipAttempt(round); if (next.status === 'playing') setSelectedGuess(null); update(next); } catch (failure) { recover(failure); } };
   const submit = async () => { if (!selectedGuess) return; const next = submitGuess(round, { trackId: selectedGuess.id, label: `${selectedGuess.title} - ${selectedGuess.artistText}` }); try { if (next.status !== 'playing') await player.pause(); else setSelectedGuess(null); update(next); } catch (failure) { recover(failure); } };
   const seconds = Math.round(round.clipLimitMs / 1000);
   const disabled = round.status !== 'playing';

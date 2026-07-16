@@ -92,6 +92,28 @@ describe('GameScreen completion interactions', () => {
     expect(changed?.attempts[0]).toEqual({ kind: 'skipped' });
   });
 
+  it('clears a selected guess when skipping to the next attempt', async () => {
+    const player = { activate: async () => undefined, playClip: async () => undefined, pause: async () => undefined };
+    const searchTracks = vi.fn().mockResolvedValue(tracks);
+    const onRoundChange = vi.fn();
+    const user = userEvent.setup();
+    const view = render(<GameScreen round={createRound(tracks[0])} tracks={tracks} searchTracks={searchTracks} player={player} onRoundChange={onRoundChange} onRoundComplete={() => undefined} onAuthExpired={() => undefined} />);
+
+    await chooseGuess(tracks[0]);
+    expect(screen.getByRole('button', { name: 'Submit guess' })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Skip +1s' }));
+    expect(onRoundChange).toHaveBeenCalledTimes(1);
+    const skippedRound = onRoundChange.mock.calls[0][0];
+    view.rerender(<GameScreen round={skippedRound} tracks={tracks} searchTracks={searchTracks} player={player} onRoundChange={onRoundChange} onRoundComplete={() => undefined} onAuthExpired={() => undefined} />);
+
+    expect(screen.getByRole('combobox', { name: 'Guess' })).toHaveValue('');
+    const submit = screen.getByRole('button', { name: 'Submit guess' });
+    expect(submit).toBeDisabled();
+    await user.click(submit);
+    expect(onRoundChange).toHaveBeenCalledTimes(1);
+  });
+
   it('clicks a correct global search result and completes the round', async () => {
     let completed = 0;
     let changed: ReturnType<typeof createRound> | undefined;

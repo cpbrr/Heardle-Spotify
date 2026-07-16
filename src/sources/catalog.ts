@@ -1,3 +1,5 @@
+import { AppError } from '../auth/authClient';
+import { parseSpotifyResource } from '../spotify/spotifyResource';
 import type { SourceDescriptor, Track } from '../spotify/types';
 import { spotifyClient } from '../spotify/spotifyClient';
 
@@ -131,7 +133,7 @@ export async function loadCatalog(
     case 'artist-mix': {
       const query = encodeURIComponent(`artist:${source.name}`);
       const response: { tracks?: { items?: unknown[]; next?: string | null } } = await client.request(
-        `/search?q=${query}&type=track&limit=50`,
+        `/search?q=${query}&type=track&limit=10`,
         { signal },
       );
       for (const item of response.tracks?.items || []) {
@@ -172,8 +174,8 @@ export async function loadCatalog(
     }
     case 'playlist':
       await collectPages(
-        `/playlists/${source.id}/tracks?limit=100`,
-        (item) => record(item)?.track,
+        `/playlists/${source.id}/items?limit=50`,
+        (item) => record(item)?.item || record(item)?.track,
         tracks,
         exclusions,
         signal,
@@ -212,12 +214,58 @@ export async function loadCatalog(
   return { tracks: Array.from(tracks.values()), exclusions };
 }
 
+export async function searchTracks(
+  query: string,
+  signal?: AbortSignal,
+  client: SpotifyApiClient = spotifyClient,
+): Promise<Track[]> {
+  const parsed = parseSpotifyResource(query);
+  if (parsed.kind === 'invalid') {
+    throw new AppError(parsed.message, { code: 'invalid_spotify_resource' });
+  }
+  if (parsed.kind === 'resource') {
+    if (parsed.resourceType !== 'track') {
+      throw new AppError('Paste playlist links in the source picker.', { code: 'wrong_spotify_resource_type' });
+    }
+    const exact = normalizeTrack(await client.request(`/tracks/${parsed.id}`, { signal }));
+    return exact ? [exact] : [];
+  }
+  if (query.trim().length < 2) {
+    return [];
+  }
+
+  const response = await client.request<{ tracks?: { items?: unknown[] } }>(
+    `/search?q=${encodeURIComponent(query.trim())}&type=track&limit=10`,
+    { signal },
+  );
+  return (response.tracks?.items || []).flatMap((item) => {
+    const track = normalizeTrack(item);
+    return track ? [track] : [];
+  });
+}
 export async function searchSources(
   kind: SourceDescriptor['kind'],
   query: string,
   signal?: AbortSignal,
   client: SpotifyApiClient = spotifyClient,
 ): Promise<SourceDescriptor[]> {
+  const parsed = parseSpotifyResource(query);
+  if (parsed.kind === 'invalid') {
+    throw new AppError(parsed.message, { code: 'invalid_spotify_resource' });
+  }
+  if (parsed.kind === 'resource') {
+    const value = record(await client.request(`/${parsed.resourceType}s/${parsed.id}`, { signal }));
+    if (!value || typeof value.id !== 'string' || typeof value.name !== 'string') {
+      return [];
+    }
+    const album = record(value.album);
+    return [{
+      kind: parsed.resourceType,
+      id: value.id,
+      name: value.name,
+      imageUrl: firstImage(value.images) || firstImage(album?.images),
+    }];
+  }
   if (kind === 'top' || kind === 'liked' || query.trim().length < 2) {
     return [];
   }

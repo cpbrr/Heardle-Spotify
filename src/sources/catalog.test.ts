@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { loadCatalog, normalizeTrack } from './catalog';
+import { loadCatalog, normalizeTrack, searchSources, searchTracks } from './catalog';
 import type { SpotifyApiClient } from './catalog';
 import type { SourceDescriptor } from '../spotify/types';
 
@@ -60,8 +60,8 @@ describe('normalizeTrack', () => {
 describe('loadCatalog', () => {
   it('follows playlist pagination, ignores nulls, and deduplicates tracks', async () => {
     const client = fakeClient({
-      '/playlists/playlist-1/tracks?limit=100': {
-        items: [{ track: spotifyTrack('one') }, { track: null }],
+      '/playlists/playlist-1/items?limit=50': {
+        items: [{ item: spotifyTrack('one') }, { item: null }],
         next: 'https://api.spotify.com/v1/next-page',
       },
       'https://api.spotify.com/v1/next-page': {
@@ -81,7 +81,7 @@ describe('loadCatalog', () => {
   });
 
   it.each([
-    [{ kind: 'artist-mix', id: 'artist-1', name: 'Artist', imageUrl: null }, '/search?q=artist%3AArtist&type=track&limit=50', { tracks: { items: [spotifyTrack('mix')], next: null } }, 'mix'],
+    [{ kind: 'artist-mix', id: 'artist-1', name: 'Artist', imageUrl: null }, '/search?q=artist%3AArtist&type=track&limit=10', { tracks: { items: [spotifyTrack('mix')], next: null } }, 'mix'],
     [{ kind: 'album', id: 'album-1', name: 'Album', imageUrl: null }, '/albums/album-1', { tracks: { items: [spotifyTrack('album')], next: null } }, 'album'],
     [{ kind: 'track', id: 'track-1', name: 'Track', imageUrl: null }, '/tracks/track-1', spotifyTrack('single'), 'single'],
     [{ kind: 'top', name: 'My top tracks', imageUrl: null }, '/me/top/tracks?limit=50', { items: [spotifyTrack('top')], next: null }, 'top'],
@@ -119,5 +119,42 @@ describe('loadCatalog', () => {
       album: 'Album',
       imageUrl: 'cover.jpg',
     })]);
+  });
+});
+
+describe('searchTracks', () => {
+  it('searches the global track catalog with the development-mode limit', async () => {
+    const client = fakeClient({
+      '/search?q=dreams&type=track&limit=10': { tracks: { items: [spotifyTrack('global')] } },
+    });
+
+    await expect(searchTracks('dreams', undefined, client)).resolves.toMatchObject([{ id: 'global' }]);
+  });
+
+  it('resolves a pasted track URL exactly', async () => {
+    const id = '4iV5W9uYEdYUVa79Axb7Rh';
+    const client = fakeClient({ [`/tracks/${id}`]: spotifyTrack(id) });
+
+    await expect(searchTracks(`https://open.spotify.com/track/${id}`, undefined, client)).resolves.toMatchObject([{ id }]);
+  });
+});
+
+describe('searchSources', () => {
+  it.each([
+    ['playlist', 'track', '4iV5W9uYEdYUVa79Axb7Rh', spotifyTrack('4iV5W9uYEdYUVa79Axb7Rh')],
+    ['track', 'playlist', 'playlist123', {
+      id: 'playlist123',
+      name: 'Exact playlist',
+      images: [{ url: 'https://images.test/playlist.jpg' }],
+    }],
+  ] as const)('resolves a pasted %s-mode URL as its actual %s kind', async (activeKind, resourceKind, id, payload) => {
+    const client = fakeClient({ [`/${resourceKind}s/${id}`]: payload });
+
+    await expect(searchSources(
+      activeKind,
+      `https://open.spotify.com/${resourceKind}/${id}`,
+      undefined,
+      client,
+    )).resolves.toEqual([expect.objectContaining({ kind: resourceKind, id })]);
   });
 });

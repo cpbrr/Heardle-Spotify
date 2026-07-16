@@ -132,6 +132,7 @@ describe('TrackSearch', () => {
 
     expect(onClear).toHaveBeenCalledOnce();
     expect(screen.queryByText('Selected guess')).not.toBeInTheDocument();
+    expect(screen.queryByRole('option')).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { selected: true })).not.toBeInTheDocument();
   });
 

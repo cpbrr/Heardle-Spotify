@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { GameScreen } from './GameScreen';
@@ -95,6 +95,25 @@ describe('GameScreen playback failures', () => {
 
 
 describe('GameScreen completion interactions', () => {
+  it('ignores repeated Skip song activation while pause is pending', async () => {
+    const pause = deferred<void>();
+    const pausePlayback = vi.fn(() => pause.promise);
+    const onRoundChange = vi.fn();
+    const onRoundComplete = vi.fn();
+    render(<GameScreen round={createRound(tracks[0])} tracks={tracks} player={{ activate: async () => undefined, playClip: async () => undefined, pause: pausePlayback }} onRoundChange={onRoundChange} onRoundComplete={onRoundComplete} onAuthExpired={() => undefined} />);
+
+    const skipSong = screen.getByRole('button', { name: 'Skip song' });
+    fireEvent.click(skipSong);
+    fireEvent.click(skipSong);
+
+    expect(pausePlayback).toHaveBeenCalledTimes(1);
+    expect(skipSong).toBeDisabled();
+
+    pause.resolve();
+    await vi.waitFor(() => expect(onRoundComplete).toHaveBeenCalledTimes(1));
+    expect(onRoundChange).toHaveBeenCalledTimes(1);
+  });
+
   it('pauses playback before Skip song immediately completes the round as a loss', async () => {
     const pause = deferred<void>();
     const pausePlayback = vi.fn(() => pause.promise);
@@ -216,6 +235,7 @@ describe('GameScreen auth failures', () => {
     expect(onRoundComplete).not.toHaveBeenCalled();
     expect(onAuthExpired).toHaveBeenCalledWith(authenticationError);
     expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Skip song' })).toBeEnabled();
   });
 });
 

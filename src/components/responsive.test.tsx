@@ -39,7 +39,7 @@ describe('responsive design contract', () => {
   it('contains all required tokens, constraints, and control sizing', () => {
     const css = fs.readFileSync(path.resolve(process.cwd(), 'src/styles/global.css'), 'utf8');
     for (const token of ['--bg: #0d0f0e', '--surface: #12150f', '--surface-inset: #171c17', '--text: #f4f6f2', '--muted: #9aa39c', '--border: #232923', '--accent: #ffffff', '--danger: #ff7a6e', '--radius-md: 14px', '--content: 42rem']) expect(css).toContain(token);
-    expect(css).toContain('minmax(0, 1fr)');
+    expect(css).toContain('min-width: 0');
     expect(css).toContain('.artwork.artwork-placeholder');
     expect(css).toContain('width: min(100%, 18rem)');
     expect((css.match(/min-height: 44px/g) || []).length).toBeGreaterThan(0);

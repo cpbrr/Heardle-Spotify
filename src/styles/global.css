@@ -18,6 +18,7 @@
   --radius-xl: 24px;
   --radius-pill: 999px;
   --content: 42rem;
+  --content-wide: 75rem;
   --font-heading: 'Sora', ui-sans-serif, system-ui, sans-serif;
   --font-body: 'Manrope', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
@@ -52,6 +53,10 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 main, .app-header { width: min(calc(100% - 32px), var(--content)); margin-inline: auto; }
 main { padding-block: 1.5rem 3rem; }
 
+.app-header, main.game-screen, .app-shell--picker {
+  width: min(calc(100% - 32px), var(--content-wide));
+}
+
 .app-header {
   min-height: 72px;
   display: flex;
@@ -60,19 +65,43 @@ main { padding-block: 1.5rem 3rem; }
   border-bottom: 1px solid var(--border);
 }
 .app-header__brand { display: flex; align-items: center; gap: .6rem; }
-.app-header__brand img { width: 30px; height: 30px; border-radius: 8px; object-fit: cover; flex: 0 0 auto; }
-.app-header span, .wordmark {
+.app-header__brand img { width: 30px; height: 30px; border-radius: 8px; object-fit: contain; flex: 0 0 auto; }
+.app-header__brand span, .app-header__brand h1, .wordmark {
   font-family: var(--font-heading);
   font-weight: 800;
+  font-size: .95rem;
   letter-spacing: .03em;
+  margin: 0;
 }
-.app-header span { font-size: .95rem; }
 .wordmark { font-size: 1.1rem; }
 
 .setup-screen, .loading-screen { display: grid; gap: 1.5rem; align-content: start; }
 
+.loading-screen { display: flex; flex-direction: column; gap: 1.5rem; min-height: min(60vh, 32rem); }
+.loading-screen__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  text-align: center;
+  padding-block: 2rem;
+}
+.loading-screen__text .status-message { font-family: var(--font-heading); font-weight: 700; font-size: 1.25rem; margin: 0; }
+.loading-screen__subtitle { color: var(--muted); font-size: .9rem; margin: .4rem 0 0; }
+.spinner {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-pill);
+  border: 4px solid var(--border);
+  border-top-color: var(--accent);
+  animation: hrSpin .9s linear infinite;
+}
+@keyframes hrSpin { to { transform: rotate(360deg); } }
+
 .setup-content.login-content { display: flex; align-items: center; gap: clamp(1.5rem, 5vw, 3rem); flex-wrap: wrap; }
-.login-mascot { width: 120px; height: 120px; object-fit: cover; border-radius: var(--radius-lg); flex: 0 0 auto; }
+.login-mascot { width: 120px; height: 120px; object-fit: contain; flex: 0 0 auto; }
 .login-copy { display: grid; gap: .6rem; max-width: 28rem; }
 .login-copy p { color: var(--muted); margin: 0 0 .4rem; }
 
@@ -88,6 +117,10 @@ main { padding-block: 1.5rem 3rem; }
 .game-screen { grid-template-columns: 1fr; align-items: start; }
 .game-screen__primary { display: grid; gap: 1.5rem; }
 .game-screen h1 { font-size: 1.7rem; margin-top: .4rem; }
+@media (min-width: 900px) {
+  .game-screen { grid-template-columns: 1.15fr .85fr; gap: 2.25rem; }
+  .game-screen h1 { font-size: 2rem; }
+}
 
 .game-screen ol { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
 .game-screen li {
@@ -196,9 +229,17 @@ main { padding-block: 1.5rem 3rem; }
 .guess-panel__skip button.ghost:hover { border: none; color: var(--text); }
 
 /* Search fields + result lists (shared by TrackSearch and SourcePicker) */
-.source-picker__header { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: .5rem; }
-.source-picker__header > div { min-width: 0; text-align: center; }
-.source-search { display: grid; gap: .75rem; }
+.source-picker__brand { display: flex; align-items: center; justify-content: space-between; }
+.source-picker__intro { display: grid; gap: .6rem; max-width: 34rem; }
+.source-picker__intro h1 { font-size: 1.7rem; }
+.source-picker__intro p { color: var(--muted); font-size: .95rem; line-height: 1.5; margin: 0; }
+.source-search { display: grid; gap: 1.25rem; }
+.source-search__header { display: flex; align-items: center; gap: 1rem; }
+.source-search__header > div { min-width: 0; }
+.source-search__header h1 { font-size: 1.3rem; }
+@media (min-width: 900px) {
+  .source-picker__intro h1 { font-size: 2.2rem; }
+}
 
 .search-field {
   min-height: 52px;
@@ -291,6 +332,10 @@ main { padding-block: 1.5rem 3rem; }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: .9rem;
+}
+@media (min-width: 900px) {
+  .source-grid { grid-template-columns: repeat(3, 1fr); gap: 1.1rem; }
+  .source-card { padding: 1.75rem; }
 }
 .source-card {
   position: relative;

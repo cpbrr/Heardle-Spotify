@@ -1,4 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 
 import { AppError, getAuthStatus, loginUrl } from '../auth/authClient';
 import { GameScreen } from '../components/GameScreen';
@@ -33,6 +34,19 @@ function AppHeader({ onChangeSource }: { onChangeSource(): void }) {
       </div>
       <button type="button" onClick={onChangeSource}>Change source</button>
     </header>
+  );
+}
+
+function LoadingBody({ title, subtitle, action }: { title: ReactNode; subtitle?: string; action?: ReactNode }) {
+  return (
+    <div className="loading-screen__body">
+      <div className="spinner" aria-hidden="true" />
+      <div className="loading-screen__text">
+        {title}
+        {subtitle ? <p className="loading-screen__subtitle">{subtitle}</p> : null}
+      </div>
+      {action ?? null}
+    </div>
   );
 }
 
@@ -224,9 +238,15 @@ export function App() {
   if (state.phase === 'loading-catalog') {
     return (
       <main className="loading-screen">
-        <p className="wordmark">Heardle</p>
-        <StatusMessage>Loading {state.source.name}...</StatusMessage>
-        <button type="button" onClick={() => void changeSource()}>Change source</button>
+        <div className="app-header__brand">
+          <img src="/mascot.png" alt="" />
+          <span>Heardle</span>
+        </div>
+        <LoadingBody
+          title={<StatusMessage>{`Loading ${state.source.name}...`}</StatusMessage>}
+          subtitle="Fetching playable tracks from Spotify"
+          action={<button type="button" onClick={() => void changeSource()}>Change source</button>}
+        />
       </main>
     );
   }
@@ -301,8 +321,11 @@ export function App() {
 
   return (
     <main className="loading-screen">
-      <h1>Heardle</h1>
-      <p>Checking Spotify connection...</p>
+      <div className="app-header__brand">
+        <img src="/mascot.png" alt="" />
+        <h1>Heardle</h1>
+      </div>
+      <LoadingBody title={<StatusMessage>Checking Spotify connection...</StatusMessage>} />
     </main>
   );
 }

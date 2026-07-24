@@ -107,25 +107,26 @@ export function SourcePicker({ onSelect, onClose, search = searchSources }: Sour
 
   return (
     <section className="source-picker" role="dialog" aria-modal="true" aria-labelledby="source-picker-title">
-      <header className="source-picker__header">
-        {activeKind ? (
-          <button type="button" className="icon-button" onClick={() => setActiveKind(null)} aria-label="Back to source types" title="Back to source types">
-            <ArrowLeft aria-hidden="true" />
-          </button>
-        ) : <span aria-hidden="true" />}
-        <div>
-          <p className="eyebrow">Song source</p>
-          <h1 id="source-picker-title">{activeTitle || 'Choose what to play'}</h1>
+      <div className="source-picker__brand">
+        <div className="app-header__brand">
+          <img src="/mascot.png" alt="" />
+          <span>Heardle</span>
         </div>
         {onClose ? (
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close source picker" title="Close source picker">
             <X aria-hidden="true" />
           </button>
-        ) : <span aria-hidden="true" />}
-      </header>
+        ) : null}
+      </div>
 
       {!activeKind ? (
         <div className="source-home">
+          <div className="source-picker__intro">
+            <span className="eyebrow">Song source</span>
+            <h1 id="source-picker-title">Choose what to play</h1>
+            <p>Point tonight&rsquo;s round at an artist, a playlist, an album, or your own library.</p>
+          </div>
+
           <div className="source-quick-picks">
             {QUICK_PICKS.map((option) => {
               const Icon = SOURCE_ICONS[option.kind];
@@ -157,6 +158,16 @@ export function SourcePicker({ onSelect, onClose, search = searchSources }: Sour
         </div>
       ) : (
         <div className="source-search">
+          <div className="source-search__header">
+            <button type="button" className="icon-button" onClick={() => setActiveKind(null)} aria-label="Back to source types" title="Back to source types">
+              <ArrowLeft aria-hidden="true" />
+            </button>
+            <div>
+              <span className="eyebrow">{activeTitle}</span>
+              <h1 id="source-picker-title">{searchLabel(activeKind)}</h1>
+            </div>
+          </div>
+
           <label className="search-field">
             <Search aria-hidden="true" size={19} />
             <input

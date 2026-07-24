@@ -110,7 +110,7 @@ describe('App game workflow', () => {
 
     await chooseTopTracks();
 
-    expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Play 0.5 second clip' })).toBeVisible();
     expect(mocks.loadCatalog).toHaveBeenCalledWith(source, expect.any(AbortSignal));
     expect(mocks.player.connect).toHaveBeenCalledTimes(1);
   });
@@ -129,7 +129,7 @@ describe('App game workflow', () => {
     await act(async () => first.resolve({ tracks: [], exclusions: { duplicates: 0, unavailable: 0, unsupported: 0 } }));
     expect(screen.getByText('Loading My liked songs...')).toBeVisible();
     await act(async () => second.resolve({ tracks, exclusions: { duplicates: 0, unavailable: 0, unsupported: 0 } }));
-    expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Play 0.5 second clip' })).toBeVisible();
   });
 
   it('returns to login with a source resume intent when catalog auth expires', async () => {
@@ -177,7 +177,7 @@ describe('App game workflow', () => {
     await screen.findByRole('link', { name: 'Connect Spotify' });
     window.dispatchEvent(new Event('focus'));
 
-    expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Play 0.5 second clip' })).toBeVisible();
     expect(mocks.loadCatalog).toHaveBeenCalledTimes(2);
     expect(mocks.loadCatalog.mock.calls[1][0]).toEqual(source);
   });
@@ -196,7 +196,7 @@ describe('App game workflow', () => {
 
     expect(mocks.loadCatalog).toHaveBeenCalledTimes(1);
     await act(async () => validation.resolve());
-    expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Play 0.5 second clip' })).toBeVisible();
     expect(mocks.loadCatalog).toHaveBeenCalledTimes(2);
   });
 
@@ -224,10 +224,10 @@ describe('App game workflow', () => {
     render(<App />);
 
     await chooseTopTracks();
-    await screen.findByRole('button', { name: 'Play 1 second clip' });
+    await screen.findByRole('button', { name: 'Play 0.5 second clip' });
     window.dispatchEvent(new Event('focus'));
 
-    expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Play 0.5 second clip' })).toBeVisible();
     expect(mocks.loadCatalog).toHaveBeenCalledTimes(1);
     expect(mocks.getAuthStatus).toHaveBeenCalledTimes(1);
   });
@@ -243,7 +243,7 @@ describe('App game workflow', () => {
     const view = render(<App />);
 
     await chooseTopTracks();
-    await userEvent.click(await screen.findByRole('button', { name: 'Play 1 second clip' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Play 0.5 second clip' }));
     await screen.findByRole('link', { name: 'Connect Spotify' });
     window.dispatchEvent(new Event('focus'));
     await vi.waitFor(() => expect(mocks.getAuthStatus).toHaveBeenCalledTimes(3));
@@ -266,14 +266,14 @@ describe('App game workflow', () => {
     render(<App />);
 
     await chooseTopTracks();
-    await user.click(await screen.findByRole('button', { name: 'Play 1 second clip' }));
+    await user.click(await screen.findByRole('button', { name: 'Play 0.5 second clip' }));
     await screen.findByRole('link', { name: 'Connect Spotify' });
     window.dispatchEvent(new Event('focus'));
 
-    expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Play 0.5 second clip' })).toBeVisible();
     expect(mocks.loadCatalog).toHaveBeenCalledTimes(1);
     expect(mocks.player.activate).toHaveBeenCalledTimes(2);
-    expect(mocks.player.playClip).toHaveBeenCalledWith('spotify:track:track-1', 1000, expect.any(Function));
+    expect(mocks.player.playClip).toHaveBeenCalledWith('spotify:track:track-1', 500, expect.any(Function));
   });
 
   it('replays the full result track after authentication is restored', async () => {
@@ -303,11 +303,11 @@ describe('App game workflow', () => {
     await chooseTopTracks();
     await userEvent.click(await screen.findByRole('button', { name: 'Change source' }));
     await chooseLikedSongs();
-    await screen.findByRole('button', { name: 'Play 1 second clip' });
+    await screen.findByRole('button', { name: 'Play 0.5 second clip' });
     await act(async () => authCheck.resolve({ ...authStatus, authenticated: false }));
     window.dispatchEvent(new Event('focus'));
 
-    expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Play 0.5 second clip' })).toBeVisible();
     expect(mocks.loadCatalog).toHaveBeenCalledTimes(2);
   });
 
@@ -333,6 +333,20 @@ describe('App game workflow', () => {
     );
   });
 
+  it('returns to the source picker when the header logo is clicked', async () => {
+    mocks.loadCatalog.mockResolvedValue({ tracks, exclusions: { duplicates: 0, unavailable: 0, unsupported: 0 } });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await chooseTopTracks();
+    await screen.findByRole('button', { name: 'Play 0.5 second clip' });
+
+    await user.click(screen.getByRole('button', { name: 'Heardle' }));
+
+    expect(await screen.findByRole('dialog')).toBeVisible();
+    expect(mocks.player.pause).toHaveBeenCalled();
+  });
+
   it('persists a winning streak and pauses before starting another round from results', async () => {
     mocks.loadCatalog.mockResolvedValue({ tracks, exclusions: { duplicates: 0, unavailable: 0, unsupported: 0 } });
     mocks.loadStreak.mockReturnValue(4);
@@ -353,6 +367,6 @@ describe('App game workflow', () => {
     expect(mocks.player.pause).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Play another' })).toBeVisible();
     await act(async () => pause.resolve());
-    expect(await screen.findByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Play 0.5 second clip' })).toBeVisible();
   });
 });

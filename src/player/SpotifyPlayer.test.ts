@@ -110,6 +110,60 @@ describe('SpotifyPlayer', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it('prewarms the device so a subsequent clip skips the transfer call', async () => {
+    const sequence: string[] = [];
+    const sdkPlayer = new SdkPlayerDouble();
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      sequence.push(String(url));
+      return successfulResponse();
+    });
+    const player = new SpotifyPlayer({
+      getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
+      fetchImpl,
+      loadSdk: vi.fn().mockResolvedValue(playerNamespace(sdkPlayer)),
+    });
+
+    await player.prewarm();
+    await player.playClip('spotify:track:abc', 2_000, vi.fn());
+
+    expect(sequence).toEqual([
+      'https://api.spotify.com/v1/me/player',
+      'https://api.spotify.com/v1/me/player/play?device_id=device-1',
+    ]);
+  });
+
+  it('re-transfers on the next clip after a play command 404s persistently', async () => {
+    const sdkPlayer = new SdkPlayerDouble();
+    const notFound = () => new Response(JSON.stringify({}), { status: 404 });
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => (
+      String(url).includes('/play?') ? notFound() : successfulResponse()
+    ));
+    const player = new SpotifyPlayer({
+      getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
+      fetchImpl,
+      loadSdk: vi.fn().mockResolvedValue(playerNamespace(sdkPlayer)),
+    });
+
+    await player.connect();
+    const firstClip = player.playClip('spotify:track:abc', 2_000, vi.fn());
+    const expectation = expect(firstClip).rejects.toMatchObject({ status: 404 });
+    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(500);
+    await expectation;
+
+    const sequence: string[] = [];
+    fetchImpl.mockImplementation(async (url: string | URL | Request) => {
+      sequence.push(String(url));
+      return successfulResponse();
+    });
+    await player.playClip('spotify:track:abc', 2_000, vi.fn());
+
+    expect(sequence).toEqual([
+      'https://api.spotify.com/v1/me/player',
+      'https://api.spotify.com/v1/me/player/play?device_id=device-1',
+    ]);
+  });
+
   it('retries a transient 5xx playback command before resolving', async () => {
     const sdkPlayer = new SdkPlayerDouble();
     const fetchImpl = vi.fn()

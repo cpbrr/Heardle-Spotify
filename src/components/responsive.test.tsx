@@ -5,10 +5,10 @@ import { GameScreen } from './GameScreen';
 import { SourcePicker } from './SourcePicker';
 
 describe('responsive listening studio structure', () => {
-  it('keeps one main and six stable attempt rows', () => {
+  it('keeps one main and seven stable attempt rows', () => {
     render(<GameScreen />);
     expect(document.querySelectorAll('main')).toHaveLength(1);
-    expect(screen.getAllByRole('listitem')).toHaveLength(6);
+    expect(screen.getAllByRole('listitem')).toHaveLength(7);
   });
 
   it('exposes dialog semantics and labelled icon controls', () => {

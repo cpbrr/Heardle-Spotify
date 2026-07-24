@@ -72,6 +72,7 @@ export class SpotifyPlayer {
   private connectPromise: Promise<string> | null = null;
   private stopTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
+  private deviceActive = false;
 
   constructor(dependencies: PlayerDependencies = {}) {
     this.getToken = dependencies.getToken || getAccessToken;
@@ -168,6 +169,30 @@ export class SpotifyPlayer {
     await this.sdkPlayer?.activateElement?.();
   }
 
+  /**
+   * Best-effort warm-up: connects and transfers playback to this device ahead
+   * of the user's first click, so the first playClip() doesn't race Spotify's
+   * "device not active yet" window right after a fresh transfer.
+   */
+  async prewarm() {
+    try {
+      await this.activate();
+      await this.transferPlayback();
+    } catch {
+      // Best-effort only - playClip() still connects/transfers/retries on its own.
+    }
+  }
+
+  private async transferPlayback() {
+    if (this.deviceActive) return;
+    const deviceId = await this.connect();
+    await this.spotifyRequest('/me/player', {
+      method: 'PUT',
+      body: JSON.stringify({ device_ids: [deviceId], play: false }),
+    });
+    this.deviceActive = true;
+  }
+
   async playClip(uri: string, limitMs: number, onProgress: (positionMs: number) => void) {
     this.clearStopTimer();
     await this.startTrack(uri);
@@ -183,15 +208,17 @@ export class SpotifyPlayer {
   }
 
   private async startTrack(uri: string) {
+    await this.transferPlayback();
     const deviceId = await this.connect();
-    await this.spotifyRequest('/me/player', {
-      method: 'PUT',
-      body: JSON.stringify({ device_ids: [deviceId], play: false }),
-    });
-    await this.spotifyRequest(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
-      method: 'PUT',
-      body: JSON.stringify({ uris: [uri], position_ms: 0 }),
-    });
+    try {
+      await this.spotifyRequest(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ uris: [uri], position_ms: 0 }),
+      });
+    } catch (error) {
+      if (error instanceof AppError && error.status === 404) this.deviceActive = false;
+      throw error;
+    }
   }
 
   async seek(positionMs: number) {
@@ -207,9 +234,14 @@ export class SpotifyPlayer {
     if (!this.deviceId) {
       return;
     }
-    await this.spotifyRequest(`/me/player/pause?device_id=${encodeURIComponent(this.deviceId)}`, {
-      method: 'PUT',
-    });
+    try {
+      await this.spotifyRequest(`/me/player/pause?device_id=${encodeURIComponent(this.deviceId)}`, {
+        method: 'PUT',
+      });
+    } catch (error) {
+      if (error instanceof AppError && error.status === 404) this.deviceActive = false;
+      throw error;
+    }
   }
 
   private async spotifyRequest(path: string, options: RequestInit) {
@@ -227,7 +259,9 @@ export class SpotifyPlayer {
       throw new AppError(payload.error?.message || 'Spotify playback command failed.', {
         code: response.status === 403 ? 'spotify_account_error' : 'spotify_playback_failed',
         status: response.status,
-        retryable: response.status >= 500,
+        // 404 here is almost always "device not active yet", a brief race right
+        // after transferring playback - not a permanent failure, worth retrying.
+        retryable: response.status >= 500 || response.status === 404,
       });
     }
   }
@@ -246,5 +280,6 @@ export class SpotifyPlayer {
     this.sdkPlayer = null;
     this.deviceId = null;
     this.connectPromise = null;
+    this.deviceActive = false;
   }
 }

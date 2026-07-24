@@ -28,10 +28,10 @@ type ResumeContext =
 function AppHeader({ onChangeSource }: { onChangeSource(): void }) {
   return (
     <header className="app-header">
-      <div className="app-header__brand">
+      <button type="button" className="app-header__brand" onClick={onChangeSource}>
         <img src="/mascot.png" alt="" />
         <span>Heardle</span>
-      </div>
+      </button>
       <button type="button" onClick={onChangeSource}>Change source</button>
     </header>
   );
@@ -238,10 +238,10 @@ export function App() {
   if (state.phase === 'loading-catalog') {
     return (
       <main className="loading-screen">
-        <div className="app-header__brand">
+        <button type="button" className="app-header__brand" onClick={() => void changeSource()}>
           <img src="/mascot.png" alt="" />
           <span>Heardle</span>
-        </div>
+        </button>
         <LoadingBody
           title={<StatusMessage>{`Loading ${state.source.name}...`}</StatusMessage>}
           subtitle="Fetching playable tracks from Spotify"

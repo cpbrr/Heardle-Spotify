@@ -1,6 +1,6 @@
 import type { Track } from '../spotify/types';
 
-export const CLIP_LIMITS = [1_000, 2_000, 4_000, 7_000, 11_000, 16_000] as const;
+export const CLIP_LIMITS = [500, 1_000, 2_000, 4_000, 7_000, 11_000, 16_000] as const;
 
 export type Attempt =
   | { kind: 'pending' }

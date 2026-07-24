@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppError } from '../auth/authClient';
 import { SpotifyClient } from './spotifyClient';
@@ -10,15 +10,20 @@ function jsonResponse(status: number, body: unknown, headers?: HeadersInit) {
   });
 }
 
-function clientReturning(response: Response) {
+function clientReturning(makeResponse: () => Response) {
   return new SpotifyClient({
     getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
-    fetchImpl: vi.fn().mockResolvedValue(response),
+    fetchImpl: vi.fn().mockImplementation(async () => makeResponse()),
   });
 }
 
 describe('SpotifyClient', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -65,14 +70,17 @@ describe('SpotifyClient', () => {
   it('exposes Spotify rate limits with a retry delay', async () => {
     const client = new SpotifyClient({
       getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
-      fetchImpl: vi.fn().mockResolvedValue(jsonResponse(429, {}, { 'Retry-After': '2' })),
+      fetchImpl: vi.fn().mockImplementation(async () => jsonResponse(429, {}, { 'Retry-After': '2' })),
     });
 
-    await expect(client.request('/me')).rejects.toEqual(expect.objectContaining({
+    const pending = client.request('/me');
+    const expectation = expect(pending).rejects.toEqual(expect.objectContaining({
       code: 'spotify_rate_limited',
       retryable: true,
       retryAfterMs: 2_000,
     }));
+    await vi.advanceTimersByTimeAsync(2_000);
+    await expectation;
   });
 
   it('converts Spotify failures to AppError instances', async () => {
@@ -89,7 +97,7 @@ describe('SpotifyClient', () => {
   });
 
   it('explains an empty development-mode 403 from account validation', async () => {
-    const client = clientReturning(new Response(null, { status: 403 }));
+    const client = clientReturning(() => new Response(null, { status: 403 }));
 
     await expect(client.request('/me')).rejects.toMatchObject({
       code: 'spotify_account_not_allowed',
@@ -99,7 +107,7 @@ describe('SpotifyClient', () => {
   });
 
   it('reconnects Spotify for playlist authorization or ownership restrictions', async () => {
-    const client = clientReturning(new Response(null, { status: 403 }));
+    const client = clientReturning(() => new Response(null, { status: 403 }));
 
     await expect(client.request('/playlists/id/items?limit=50')).rejects.toMatchObject({
       code: 'spotify_playlist_access_required',
@@ -110,13 +118,16 @@ describe('SpotifyClient', () => {
   });
 
   it('preserves a safe plain-text Spotify failure message', async () => {
-    const client = clientReturning(new Response('Spotify is temporarily unavailable.', { status: 503 }));
+    const client = clientReturning(() => new Response('Spotify is temporarily unavailable.', { status: 503 }));
 
-    await expect(client.request('/me')).rejects.toMatchObject({
+    const pending = client.request('/me');
+    const expectation = expect(pending).rejects.toMatchObject({
       code: 'spotify_request_failed',
       message: 'Spotify is temporarily unavailable. (HTTP 503)',
       retryable: true,
     });
+    await vi.advanceTimersByTimeAsync(500);
+    await expectation;
   });
 
   it.each([
@@ -124,11 +135,14 @@ describe('SpotifyClient', () => {
     [502, '<html>Bad gateway</html>', 'Spotify request failed. (HTTP 502)'],
     [400, JSON.stringify({ error: { message: 'Malformed request' } }), 'Malformed request (HTTP 400)'],
   ])('includes HTTP %s in ordinary Spotify failures', async (status, body, expectedMessage) => {
-    const client = clientReturning(new Response(body, { status }));
+    const client = clientReturning(() => new Response(body, { status }));
 
-    await expect(client.request('/search')).rejects.toMatchObject({
+    const pending = client.request('/search');
+    const expectation = expect(pending).rejects.toMatchObject({
       status,
       message: expectedMessage,
     });
+    await vi.advanceTimersByTimeAsync(500);
+    await expectation;
   });
 });

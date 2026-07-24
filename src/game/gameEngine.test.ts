@@ -26,8 +26,8 @@ function track(id: string, title = `Track ${id}`, artist = 'Artist'): Track {
 }
 
 describe('gameEngine', () => {
-  it('uses the six Heardle clip limits', () => {
-    expect(CLIP_LIMITS).toEqual([1_000, 2_000, 4_000, 7_000, 11_000, 16_000]);
+  it('uses the seven Heardle clip limits', () => {
+    expect(CLIP_LIMITS).toEqual([500, 1_000, 2_000, 4_000, 7_000, 11_000, 16_000]);
   });
 
   it('advances from a wrong guess to the next clip', () => {
@@ -39,7 +39,7 @@ describe('gameEngine', () => {
     expect(round.status).toBe('playing');
     expect(round.attemptIndex).toBe(1);
     expect(round.attempts[0]).toEqual({ kind: 'incorrect', label: 'Wrong - Artist' });
-    expect(round.clipLimitMs).toBe(2_000);
+    expect(round.clipLimitMs).toBe(1_000);
   });
 
   it('wins when the selected track id matches the answer', () => {
@@ -60,9 +60,9 @@ describe('gameEngine', () => {
     expect(round.status).toBe('won');
   });
 
-  it('records skips and loses after the sixth consumed attempt', () => {
+  it('records skips and loses after the last consumed attempt', () => {
     let round = createRound(track('answer'));
-    for (let index = 0; index < 6; index += 1) {
+    for (let index = 0; index < CLIP_LIMITS.length; index += 1) {
       round = skipAttempt(round);
     }
 

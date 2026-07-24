@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { GameScreen } from './GameScreen';
 
 describe('GameScreen', () => {
-  it('renders six stable attempt rows', () => {
+  it('renders seven stable attempt rows', () => {
     render(<GameScreen />);
-    expect(screen.getAllByRole('listitem')).toHaveLength(6);
+    expect(screen.getAllByRole('listitem')).toHaveLength(7);
   });
 });
 
@@ -38,7 +38,7 @@ describe('GameScreen clip controls', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Play 1 second clip' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Play 0.5 second clip' })).toBeVisible();
   });
 });
 import userEvent from '@testing-library/user-event';
@@ -57,7 +57,7 @@ describe('GameScreen interactions', () => {
     const user = userEvent.setup();
     render(<GameScreen round={createRound(tracks[0])} tracks={tracks} searchTracks={vi.fn().mockResolvedValue([outsideTrack])} player={player} onRoundChange={(round) => { changed = round; }} onRoundComplete={() => undefined} onAuthExpired={() => undefined} />);
 
-    await user.click(screen.getByRole('button', { name: 'Play 1 second clip' }));
+    await user.click(screen.getByRole('button', { name: 'Play 0.5 second clip' }));
     expect(calls).toEqual(['activate', 'play']);
     await chooseGuess(outsideTrack);
     await user.click(screen.getByRole('button', { name: 'Submit guess' }));
@@ -87,7 +87,7 @@ describe('GameScreen playback failures', () => {
     const user = userEvent.setup();
     render(<GameScreen round={createRound(tracks[0])} tracks={tracks} player={player} onRoundChange={() => undefined} onRoundComplete={() => undefined} onAuthExpired={() => { recovered += 1; }} />);
 
-    await user.click(screen.getByRole('button', { name: 'Play 1 second clip' }));
+    await user.click(screen.getByRole('button', { name: 'Play 0.5 second clip' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Speaker unavailable');
     expect(recovered).toBe(0);
   });
@@ -196,7 +196,7 @@ describe('GameScreen completion interactions', () => {
   it('completes a final skip as a loss and disables terminal controls', async () => {
     let completed = 0;
     let changed: ReturnType<typeof createRound> | undefined;
-    const lastAttempt = { ...createRound(tracks[0]), attemptIndex: 5, clipLimitMs: 16_000 };
+    const lastAttempt = { ...createRound(tracks[0]), attemptIndex: 6, clipLimitMs: 16_000 };
     const user = userEvent.setup();
     render(<GameScreen round={lastAttempt} tracks={tracks} player={{ activate: async () => undefined, playClip: async () => undefined, pause: async () => undefined }} onRoundChange={(round) => { changed = round; }} onRoundComplete={() => { completed += 1; }} onAuthExpired={() => undefined} />);
     await user.click(screen.getByRole('button', { name: 'Skip +1s' }));
@@ -217,7 +217,7 @@ describe('GameScreen auth failures', () => {
     let recovered = 0;
     const user = userEvent.setup();
     render(<GameScreen round={createRound(tracks[0])} tracks={tracks} player={{ activate: async () => { throw new AppError('Expired', { status: 401, code: 'spotify_authentication_error' }); }, playClip: async () => undefined, pause: async () => undefined }} onRoundChange={() => undefined} onRoundComplete={() => undefined} onAuthExpired={() => { recovered += 1; }} />);
-    await user.click(screen.getByRole('button', { name: 'Play 1 second clip' }));
+    await user.click(screen.getByRole('button', { name: 'Play 0.5 second clip' }));
     expect(recovered).toBe(1);
     expect(screen.queryByRole('alert')).toBeNull();
   });

@@ -1,4 +1,5 @@
 import { AppError, getAccessToken } from '../auth/authClient';
+import { withRetry } from '../auth/withRetry';
 
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 
@@ -53,7 +54,7 @@ export class SpotifyClient {
   }
 
   async request<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
-    return this.requestWithRetry<T>(path, options, false);
+    return withRetry(() => this.requestWithRetry<T>(path, options, false), { maxRetries: 1 });
   }
 
   private async requestWithRetry<T>(path: string, options: RequestInit, retried: boolean): Promise<T> {

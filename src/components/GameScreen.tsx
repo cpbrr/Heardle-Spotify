@@ -11,6 +11,7 @@ type GamePlayer = {
   activate(): Promise<void>;
   playClip(uri: string, limitMs: number, onProgress: (positionMs: number) => void): Promise<void>;
   pause(): Promise<void>;
+  prewarm?(): Promise<void>;
 };
 
 interface GameScreenProps {
@@ -51,12 +52,16 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
     };
   }, [round?.attemptIndex]);
 
+  useEffect(() => {
+    void player?.prewarm?.().catch(() => undefined);
+  }, [player]);
+
   if (!round || !player) {
     return (
       <main>
         <h1>Heardle</h1>
         <ol aria-label="Attempts">
-          {Array.from({ length: 6 }, (_, index) => <li key={index}>Pending</li>)}
+          {Array.from({ length: CLIP_LIMITS.length }, (_, index) => <li key={index}>Pending</li>)}
         </ol>
       </main>
     );
@@ -151,7 +156,7 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
     }
   };
 
-  const seconds = Math.round(round.clipLimitMs / 1000);
+  const seconds = round.clipLimitMs / 1000;
   const disabled = round.status !== 'playing' || isCompleting;
 
   return (
@@ -214,7 +219,7 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
                 style={{ left: `${(limitMs / MAX_CLIP_MS) * 100}%` }}
                 data-current={index === round.attemptIndex}
               >
-                {Math.round(limitMs / 1000)}s
+                {limitMs / 1000}s
               </span>
             ))}
           </div>

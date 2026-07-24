@@ -66,6 +66,15 @@ main { padding-block: 1.5rem 3rem; }
 }
 .app-header__brand { display: flex; align-items: center; gap: .6rem; }
 .app-header__brand img { width: 30px; height: 30px; border-radius: 8px; object-fit: contain; flex: 0 0 auto; }
+button.app-header__brand {
+  border: none;
+  background: transparent;
+  padding: 0;
+  min-height: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+button.app-header__brand:hover { border-color: transparent; opacity: .82; }
 .app-header__brand span, .app-header__brand h1, .wordmark {
   font-family: var(--font-heading);
   font-weight: 800;

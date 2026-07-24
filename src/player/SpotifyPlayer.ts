@@ -175,6 +175,14 @@ export class SpotifyPlayer {
     await this.sdkPlayer?.activateElement?.();
     await this.connect();
     if (!hadPlayer) await this.sdkPlayer?.activateElement?.();
+    // Some mobile browsers only route audio through the "media" (not silenced
+    // by a mute switch) channel once the SDK's volume is explicitly touched
+    // post-activation, rather than left at its construction-time default.
+    try {
+      await this.sdkPlayer?.setVolume?.(0.5);
+    } catch {
+      // Best-effort only.
+    }
   }
 
   /**

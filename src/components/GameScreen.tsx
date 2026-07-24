@@ -26,7 +26,6 @@ interface GameScreenProps {
 
 const MAX_CLIP_MS = CLIP_LIMITS[CLIP_LIMITS.length - 1];
 const WAVEFORM_BAR_HEIGHTS = [34, 58, 22, 71, 45, 63, 30, 82, 40, 26, 52, 36, 68, 24, 58, 32, 74, 20, 48, 30];
-const WAVEFORM_PLAYED_BARS = 9;
 
 function isAuthenticationError(error: unknown) {
   return error instanceof AppError && (error.status === 401 || error.code.includes('auth'));
@@ -40,12 +39,16 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
   const [isPlaying, setIsPlaying] = useState(false);
   const isPlayingRef = useRef(false);
   const [fillPct, setFillPct] = useState(0);
+  const [waveformPct, setWaveformPct] = useState(0);
   const [fillTransition, setFillTransition] = useState('none');
+  const [isClipPlaying, setIsClipPlaying] = useState(false);
   const fillTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setFillPct(0);
+    setWaveformPct(0);
     setFillTransition('none');
+    setIsClipPlaying(false);
     if (fillTimerRef.current) clearTimeout(fillTimerRef.current);
     return () => {
       if (fillTimerRef.current) clearTimeout(fillTimerRef.current);
@@ -72,15 +75,20 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
     const targetPct = (clipMs / MAX_CLIP_MS) * 100;
     setFillTransition('none');
     setFillPct(0);
+    setWaveformPct(0);
+    setIsClipPlaying(true);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setFillTransition(`width ${clipMs}ms linear`);
         setFillPct(targetPct);
+        setWaveformPct(100);
       });
     });
     fillTimerRef.current = setTimeout(() => {
       setFillTransition('none');
       setFillPct(0);
+      setWaveformPct(0);
+      setIsClipPlaying(false);
     }, clipMs + 80);
   };
 
@@ -187,10 +195,19 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
           >
             <Play size={28} fill="currentColor" aria-hidden="true" />
           </button>
-          <div className="waveform" aria-hidden="true">
-            {WAVEFORM_BAR_HEIGHTS.map((height, index) => (
-              <span key={index} style={{ height: `${height}%` }} data-played={index < WAVEFORM_PLAYED_BARS} />
-            ))}
+          <div className="waveform" data-active={isClipPlaying} aria-hidden="true">
+            <div className="waveform__bars">
+              {WAVEFORM_BAR_HEIGHTS.map((height, index) => (
+                <span key={index} style={{ height: `${height}%`, animationDelay: `${(index * 7) % 10 * 0.06}s` }} />
+              ))}
+            </div>
+            <div className="waveform__played" style={{ width: `${waveformPct}%`, transition: fillTransition }}>
+              <div className="waveform__bars">
+                {WAVEFORM_BAR_HEIGHTS.map((height, index) => (
+                  <span key={index} style={{ height: `${height}%`, animationDelay: `${(index * 7) % 10 * 0.06}s` }} />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 

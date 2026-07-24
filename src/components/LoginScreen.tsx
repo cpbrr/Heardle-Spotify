@@ -1,5 +1,6 @@
 import { Music } from 'lucide-react';
 
+import mascotUrl from '../assets/mascot.png';
 import { loginUrl } from '../auth/authClient';
 
 export function LoginScreen() {
@@ -7,7 +8,7 @@ export function LoginScreen() {
     <main className="setup-screen">
       <p className="wordmark">Heardle</p>
       <section className="setup-content login-content" aria-labelledby="login-title">
-        <img src="/mascot.png" alt="" className="login-mascot" />
+        <img src={mascotUrl} alt="" className="login-mascot" />
         <div className="login-copy">
           <h1 id="login-title">Listen. Guess. Reveal.</h1>
           <p>Connect your Spotify Premium account to play.</p>

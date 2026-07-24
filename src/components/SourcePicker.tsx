@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Disc3, Heart, Library, ListMusic, Music, Search, TrendingUp, Users, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
+import mascotUrl from '../assets/mascot.png';
 import { useSearchCombobox } from '../hooks/useSearchCombobox';
 import { searchSources } from '../sources/catalog';
 import type { SourceDescriptor } from '../spotify/types';
@@ -109,7 +110,7 @@ export function SourcePicker({ onSelect, onClose, search = searchSources }: Sour
     <section className="source-picker" role="dialog" aria-modal="true" aria-labelledby="source-picker-title">
       <div className="source-picker__brand">
         <div className="app-header__brand">
-          <img src="/mascot.png" alt="" />
+          <img src={mascotUrl} alt="" />
           <span>Heardle</span>
         </div>
         {onClose ? (

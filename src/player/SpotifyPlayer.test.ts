@@ -92,6 +92,28 @@ describe('SpotifyPlayer', () => {
     );
   });
 
+  it('unlocks playback after connecting on a cold start, since there is no SDK player to unlock beforehand', async () => {
+    const sequence: string[] = [];
+    const sdkPlayer = new SdkPlayerDouble();
+    sdkPlayer.activateElement.mockImplementation(async () => {
+      sequence.push('sdk.activate');
+    });
+    const player = new SpotifyPlayer({
+      getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
+      fetchImpl: vi.fn().mockResolvedValue(successfulResponse()),
+      loadSdk: vi.fn(async () => {
+        sequence.push('sdk.loaded');
+        return playerNamespace(sdkPlayer);
+      }),
+    });
+
+    // No prior connect() - the SDK player doesn't exist yet when activate() starts.
+    await player.activate();
+
+    expect(sequence).toEqual(['sdk.loaded', 'sdk.activate']);
+    expect(sdkPlayer.activateElement).toHaveBeenCalledOnce();
+  });
+
   it('clears an old clip timer before starting full-track playback', async () => {
     const sdkPlayer = new SdkPlayerDouble();
     const fetchImpl = vi.fn().mockResolvedValue(successfulResponse());

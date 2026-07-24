@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import mascotUrl from '../assets/mascot.png';
 import { AppError, getAuthStatus, loginUrl } from '../auth/authClient';
 import { GameScreen } from '../components/GameScreen';
 import { LoginScreen } from '../components/LoginScreen';
@@ -29,7 +30,7 @@ function AppHeader({ onChangeSource }: { onChangeSource(): void }) {
   return (
     <header className="app-header">
       <button type="button" className="app-header__brand" onClick={onChangeSource}>
-        <img src="/mascot.png" alt="" />
+        <img src={mascotUrl} alt="" />
         <span>Heardle</span>
       </button>
       <button type="button" onClick={onChangeSource}>Change source</button>
@@ -239,7 +240,7 @@ export function App() {
     return (
       <main className="loading-screen">
         <button type="button" className="app-header__brand" onClick={() => void changeSource()}>
-          <img src="/mascot.png" alt="" />
+          <img src={mascotUrl} alt="" />
           <span>Heardle</span>
         </button>
         <LoadingBody
@@ -315,7 +316,7 @@ export function App() {
             onPlayAnother={() => void playAnotherRound()}
           />
           <div className="result-mascot" aria-hidden="true">
-            <img src="/mascot.png" alt="" />
+            <img src={mascotUrl} alt="" />
           </div>
         </main>
       </>
@@ -325,7 +326,7 @@ export function App() {
   return (
     <main className="loading-screen">
       <div className="app-header__brand">
-        <img src="/mascot.png" alt="" />
+        <img src={mascotUrl} alt="" />
         <h1>Heardle</h1>
       </div>
       <LoadingBody title={<StatusMessage>Checking Spotify connection...</StatusMessage>} />

@@ -165,8 +165,16 @@ export class SpotifyPlayer {
   }
 
   async activate() {
-    await this.connect();
+    // Mobile browsers only allow unlocking audio playback synchronously within
+    // the user gesture that triggered it - any await beforehand can drop out
+    // of that window and leave playback silently muted. Unlock first (works
+    // whenever prewarm() already created the SDK player), and only fall back
+    // to unlocking after connect() on a genuinely cold start, where there's
+    // no way to avoid the wait.
+    const hadPlayer = Boolean(this.sdkPlayer);
     await this.sdkPlayer?.activateElement?.();
+    await this.connect();
+    if (!hadPlayer) await this.sdkPlayer?.activateElement?.();
   }
 
   /**

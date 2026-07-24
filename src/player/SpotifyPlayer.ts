@@ -1,5 +1,4 @@
 import { AppError, getAccessToken } from '../auth/authClient';
-import { withRetry } from '../auth/withRetry';
 import { SPOTIFY_PREMIUM_REQUIRED_MESSAGE } from '../spotify/account';
 import type { SpotifyNamespace, SpotifySdkPlayer } from './spotify-sdk';
 
@@ -72,7 +71,6 @@ export class SpotifyPlayer {
   private connectPromise: Promise<string> | null = null;
   private stopTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
-  private deviceActive = false;
 
   constructor(dependencies: PlayerDependencies = {}) {
     this.getToken = dependencies.getToken || getAccessToken;
@@ -165,48 +163,8 @@ export class SpotifyPlayer {
   }
 
   async activate() {
-    // Mobile browsers only allow unlocking audio playback synchronously within
-    // the user gesture that triggered it - any await beforehand can drop out
-    // of that window and leave playback silently muted. Unlock first (works
-    // whenever prewarm() already created the SDK player), and only fall back
-    // to unlocking after connect() on a genuinely cold start, where there's
-    // no way to avoid the wait.
-    const hadPlayer = Boolean(this.sdkPlayer);
-    await this.sdkPlayer?.activateElement?.();
     await this.connect();
-    if (!hadPlayer) await this.sdkPlayer?.activateElement?.();
-    // Some mobile browsers only route audio through the "media" (not silenced
-    // by a mute switch) channel once the SDK's volume is explicitly touched
-    // post-activation, rather than left at its construction-time default.
-    try {
-      await this.sdkPlayer?.setVolume?.(0.5);
-    } catch {
-      // Best-effort only.
-    }
-  }
-
-  /**
-   * Best-effort warm-up: connects and transfers playback to this device ahead
-   * of the user's first click, so the first playClip() doesn't race Spotify's
-   * "device not active yet" window right after a fresh transfer.
-   */
-  async prewarm() {
-    try {
-      await this.activate();
-      await this.transferPlayback();
-    } catch {
-      // Best-effort only - playClip() still connects/transfers/retries on its own.
-    }
-  }
-
-  private async transferPlayback() {
-    if (this.deviceActive) return;
-    const deviceId = await this.connect();
-    await this.spotifyRequest('/me/player', {
-      method: 'PUT',
-      body: JSON.stringify({ device_ids: [deviceId], play: false }),
-    });
-    this.deviceActive = true;
+    await this.sdkPlayer?.activateElement?.();
   }
 
   async playClip(uri: string, limitMs: number, onProgress: (positionMs: number) => void) {
@@ -224,17 +182,16 @@ export class SpotifyPlayer {
   }
 
   private async startTrack(uri: string) {
-    await this.transferPlayback();
     const deviceId = await this.connect();
-    try {
-      await this.spotifyRequest(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
-        method: 'PUT',
-        body: JSON.stringify({ uris: [uri], position_ms: 0 }),
-      });
-    } catch (error) {
-      if (error instanceof AppError && error.status === 404) this.deviceActive = false;
-      throw error;
-    }
+    await this.spotifyRequest('/me/player', {
+      method: 'PUT',
+      body: JSON.stringify({ device_ids: [deviceId], play: false }),
+    });
+    await this.seek(0);
+    await this.spotifyRequest(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ uris: [uri], position_ms: 0 }),
+    });
   }
 
   async seek(positionMs: number) {
@@ -250,21 +207,12 @@ export class SpotifyPlayer {
     if (!this.deviceId) {
       return;
     }
-    try {
-      await this.spotifyRequest(`/me/player/pause?device_id=${encodeURIComponent(this.deviceId)}`, {
-        method: 'PUT',
-      });
-    } catch (error) {
-      if (error instanceof AppError && error.status === 404) this.deviceActive = false;
-      throw error;
-    }
+    await this.spotifyRequest(`/me/player/pause?device_id=${encodeURIComponent(this.deviceId)}`, {
+      method: 'PUT',
+    });
   }
 
   private async spotifyRequest(path: string, options: RequestInit) {
-    return withRetry(() => this.performSpotifyRequest(path, options));
-  }
-
-  private async performSpotifyRequest(path: string, options: RequestInit) {
     const { accessToken } = await this.getToken();
     const headers = new Headers(options.headers);
     headers.set('Authorization', `Bearer ${accessToken}`);
@@ -275,9 +223,7 @@ export class SpotifyPlayer {
       throw new AppError(payload.error?.message || 'Spotify playback command failed.', {
         code: response.status === 403 ? 'spotify_account_error' : 'spotify_playback_failed',
         status: response.status,
-        // 404 here is almost always "device not active yet", a brief race right
-        // after transferring playback - not a permanent failure, worth retrying.
-        retryable: response.status >= 500 || response.status === 404,
+        retryable: response.status >= 500,
       });
     }
   }
@@ -296,6 +242,5 @@ export class SpotifyPlayer {
     this.sdkPlayer = null;
     this.deviceId = null;
     this.connectPromise = null;
-    this.deviceActive = false;
   }
 }

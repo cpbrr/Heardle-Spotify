@@ -82,6 +82,7 @@ describe('SpotifyPlayer', () => {
     expect(sequence).toEqual([
       'sdk.activate',
       'https://api.spotify.com/v1/me/player',
+      'https://api.spotify.com/v1/me/player/seek?position_ms=0&device_id=device-1',
       'https://api.spotify.com/v1/me/player/play?device_id=device-1',
     ]);
 
@@ -90,28 +91,6 @@ describe('SpotifyPlayer', () => {
       'https://api.spotify.com/v1/me/player/pause?device_id=device-1',
       expect.objectContaining({ method: 'PUT' }),
     );
-  });
-
-  it('unlocks playback after connecting on a cold start, since there is no SDK player to unlock beforehand', async () => {
-    const sequence: string[] = [];
-    const sdkPlayer = new SdkPlayerDouble();
-    sdkPlayer.activateElement.mockImplementation(async () => {
-      sequence.push('sdk.activate');
-    });
-    const player = new SpotifyPlayer({
-      getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
-      fetchImpl: vi.fn().mockResolvedValue(successfulResponse()),
-      loadSdk: vi.fn(async () => {
-        sequence.push('sdk.loaded');
-        return playerNamespace(sdkPlayer);
-      }),
-    });
-
-    // No prior connect() - the SDK player doesn't exist yet when activate() starts.
-    await player.activate();
-
-    expect(sequence).toEqual(['sdk.loaded', 'sdk.activate']);
-    expect(sdkPlayer.activateElement).toHaveBeenCalledOnce();
   });
 
   it('clears an old clip timer before starting full-track playback', async () => {
@@ -130,79 +109,6 @@ describe('SpotifyPlayer', () => {
     await vi.advanceTimersByTimeAsync(1_000);
 
     expect(fetchImpl).not.toHaveBeenCalled();
-  });
-
-  it('prewarms the device so a subsequent clip skips the transfer call', async () => {
-    const sequence: string[] = [];
-    const sdkPlayer = new SdkPlayerDouble();
-    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
-      sequence.push(String(url));
-      return successfulResponse();
-    });
-    const player = new SpotifyPlayer({
-      getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
-      fetchImpl,
-      loadSdk: vi.fn().mockResolvedValue(playerNamespace(sdkPlayer)),
-    });
-
-    await player.prewarm();
-    await player.playClip('spotify:track:abc', 2_000, vi.fn());
-
-    expect(sequence).toEqual([
-      'https://api.spotify.com/v1/me/player',
-      'https://api.spotify.com/v1/me/player/play?device_id=device-1',
-    ]);
-  });
-
-  it('re-transfers on the next clip after a play command 404s persistently', async () => {
-    const sdkPlayer = new SdkPlayerDouble();
-    const notFound = () => new Response(JSON.stringify({}), { status: 404 });
-    const fetchImpl = vi.fn(async (url: string | URL | Request) => (
-      String(url).includes('/play?') ? notFound() : successfulResponse()
-    ));
-    const player = new SpotifyPlayer({
-      getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
-      fetchImpl,
-      loadSdk: vi.fn().mockResolvedValue(playerNamespace(sdkPlayer)),
-    });
-
-    await player.connect();
-    const firstClip = player.playClip('spotify:track:abc', 2_000, vi.fn());
-    const expectation = expect(firstClip).rejects.toMatchObject({ status: 404 });
-    await vi.advanceTimersByTimeAsync(500);
-    await vi.advanceTimersByTimeAsync(500);
-    await expectation;
-
-    const sequence: string[] = [];
-    fetchImpl.mockImplementation(async (url: string | URL | Request) => {
-      sequence.push(String(url));
-      return successfulResponse();
-    });
-    await player.playClip('spotify:track:abc', 2_000, vi.fn());
-
-    expect(sequence).toEqual([
-      'https://api.spotify.com/v1/me/player',
-      'https://api.spotify.com/v1/me/player/play?device_id=device-1',
-    ]);
-  });
-
-  it('retries a transient 5xx playback command before resolving', async () => {
-    const sdkPlayer = new SdkPlayerDouble();
-    const fetchImpl = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 502 }))
-      .mockResolvedValueOnce(successfulResponse());
-    const player = new SpotifyPlayer({
-      getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
-      fetchImpl,
-      loadSdk: vi.fn().mockResolvedValue(playerNamespace(sdkPlayer)),
-    });
-
-    await player.connect();
-    const pausePromise = player.pause();
-    await vi.advanceTimersByTimeAsync(500);
-
-    await expect(pausePromise).resolves.toBeUndefined();
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   it('times out when Spotify never supplies a device id', async () => {

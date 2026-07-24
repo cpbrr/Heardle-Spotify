@@ -22,5 +22,4 @@ export interface SpotifySdkPlayer {
   connect(): Promise<boolean>;
   disconnect(): void;
   activateElement?(): Promise<void>;
-  setVolume?(volume: number): Promise<void>;
 }

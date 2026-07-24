@@ -11,7 +11,6 @@ type GamePlayer = {
   activate(): Promise<void>;
   playClip(uri: string, limitMs: number, onProgress: (positionMs: number) => void): Promise<void>;
   pause(): Promise<void>;
-  prewarm?(): Promise<void>;
 };
 
 interface GameScreenProps {
@@ -54,10 +53,6 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
       if (fillTimerRef.current) clearTimeout(fillTimerRef.current);
     };
   }, [round?.attemptIndex]);
-
-  useEffect(() => {
-    void player?.prewarm?.().catch(() => undefined);
-  }, [player]);
 
   if (!round || !player) {
     return (

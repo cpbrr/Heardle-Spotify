@@ -1,12 +1,4 @@
-export interface AuthStatus {
-  configured: boolean;
-  authenticated: boolean;
-  redirectUri: string;
-  missing: {
-    clientId: boolean;
-    clientSecret: boolean;
-  };
-}
+import type { AuthStatus } from '../spotify/types';
 
 export interface TokenResult {
   accessToken: string;

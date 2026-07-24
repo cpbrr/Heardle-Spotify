@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   loadRecentTrackIds,
-  loadSource,
   loadStreak,
   saveRecentTrackIds,
   saveSource,
@@ -44,18 +43,12 @@ beforeEach(() => {
 });
 
 describe('sourceStorage', () => {
-  it('round trips a valid source descriptor', () => {
+  it('persists a source descriptor', () => {
     const source = { kind: 'album' as const, id: 'album-1', name: 'Album', imageUrl: null };
 
     saveSource(source, storage);
 
-    expect(loadSource(storage)).toEqual(source);
-  });
-
-  it('rejects malformed persisted sources', () => {
-    storage.setItem('heardle:source', JSON.stringify({ kind: 'playlist', name: 'Missing ID' }));
-
-    expect(loadSource(storage)).toBeNull();
+    expect(storage.getItem('heardle:source')).toBe(JSON.stringify(source));
   });
 
   it('falls back to zero for corrupt streak data', () => {

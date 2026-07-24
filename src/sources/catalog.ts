@@ -5,6 +5,7 @@ import { spotifyClient } from '../spotify/spotifyClient';
 
 const MAX_TRACKS = 500;
 const MAX_ARTIST_RELEASES = 100;
+const CONCURRENT_RELEASES = 5;
 
 export interface CatalogExclusions {
   duplicates: number;
@@ -146,27 +147,35 @@ export async function loadCatalog(
       let releaseCount = 0;
       while (releasesPath && releaseCount < MAX_ARTIST_RELEASES && tracks.size < MAX_TRACKS) {
         const releases: { items?: unknown[]; next?: string | null } = await client.request(releasesPath, { signal });
+        const albums: Array<{ id: string; name: string; imageUrl: string | null }> = [];
         for (const value of releases.items || []) {
           const album = record(value);
-          if (typeof album?.id !== 'string') {
-            continue;
+          if (typeof album?.id === 'string') {
+            albums.push({
+              id: album.id,
+              name: typeof album.name === 'string' ? album.name : '',
+              imageUrl: firstImage(album.images),
+            });
           }
-          releaseCount += 1;
-          await collectPages(
+        }
+
+        for (
+          let i = 0;
+          i < albums.length && releaseCount < MAX_ARTIST_RELEASES && tracks.size < MAX_TRACKS;
+          i += CONCURRENT_RELEASES
+        ) {
+          const remaining = MAX_ARTIST_RELEASES - releaseCount;
+          const batch = albums.slice(i, i + CONCURRENT_RELEASES).slice(0, remaining);
+          releaseCount += batch.length;
+          await Promise.all(batch.map((album) => collectPages(
             `/albums/${album.id}/tracks?limit=50`,
             (item) => item,
             tracks,
             exclusions,
             signal,
             client,
-            {
-              name: typeof album.name === 'string' ? album.name : '',
-              imageUrl: firstImage(album.images),
-            },
-          );
-          if (releaseCount >= MAX_ARTIST_RELEASES || tracks.size >= MAX_TRACKS) {
-            break;
-          }
+            { name: album.name, imageUrl: album.imageUrl },
+          )));
         }
         releasesPath = releases.next || null;
       }

@@ -1,4 +1,5 @@
 import { AppError, getAccessToken } from '../auth/authClient';
+import { withRetry } from '../auth/withRetry';
 import { SPOTIFY_PREMIUM_REQUIRED_MESSAGE } from '../spotify/account';
 import type { SpotifyNamespace, SpotifySdkPlayer } from './spotify-sdk';
 
@@ -187,7 +188,6 @@ export class SpotifyPlayer {
       method: 'PUT',
       body: JSON.stringify({ device_ids: [deviceId], play: false }),
     });
-    await this.seek(0);
     await this.spotifyRequest(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
       method: 'PUT',
       body: JSON.stringify({ uris: [uri], position_ms: 0 }),
@@ -213,6 +213,10 @@ export class SpotifyPlayer {
   }
 
   private async spotifyRequest(path: string, options: RequestInit) {
+    return withRetry(() => this.performSpotifyRequest(path, options));
+  }
+
+  private async performSpotifyRequest(path: string, options: RequestInit) {
     const { accessToken } = await this.getToken();
     const headers = new Headers(options.headers);
     headers.set('Authorization', `Bearer ${accessToken}`);

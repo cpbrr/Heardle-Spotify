@@ -82,7 +82,6 @@ describe('SpotifyPlayer', () => {
     expect(sequence).toEqual([
       'sdk.activate',
       'https://api.spotify.com/v1/me/player',
-      'https://api.spotify.com/v1/me/player/seek?position_ms=0&device_id=device-1',
       'https://api.spotify.com/v1/me/player/play?device_id=device-1',
     ]);
 
@@ -109,6 +108,25 @@ describe('SpotifyPlayer', () => {
     await vi.advanceTimersByTimeAsync(1_000);
 
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('retries a transient 5xx playback command before resolving', async () => {
+    const sdkPlayer = new SdkPlayerDouble();
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 502 }))
+      .mockResolvedValueOnce(successfulResponse());
+    const player = new SpotifyPlayer({
+      getToken: vi.fn().mockResolvedValue({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
+      fetchImpl,
+      loadSdk: vi.fn().mockResolvedValue(playerNamespace(sdkPlayer)),
+    });
+
+    await player.connect();
+    const pausePromise = player.pause();
+    await vi.advanceTimersByTimeAsync(500);
+
+    await expect(pausePromise).resolves.toBeUndefined();
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   it('times out when Spotify never supplies a device id', async () => {

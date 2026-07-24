@@ -16,9 +16,11 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
   const [selectedGuess, setSelectedGuess] = useState<Track | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
   const isCompletingRef = useRef(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const isPlayingRef = useRef(false);
   if (!round || !player) return <main><h1>Heardle</h1><ol aria-label="Attempts">{Array.from({ length: 6 }, (_, index) => <li key={index}>Pending</li>)}</ol></main>;
   const recover = (failure: unknown) => { if (isAuthenticationError(failure)) onAuthExpired?.(failure); else setError(failure instanceof Error ? failure.message : 'Playback failed.'); };
-  const play = async () => { setError(null); try { await player.activate(); await player.playClip(round.answer.uri, round.clipLimitMs, () => undefined); } catch (failure) { recover(failure); } };
+  const play = async () => { if (isPlayingRef.current) return; isPlayingRef.current = true; setIsPlaying(true); setError(null); try { await player.activate(); await player.playClip(round.answer.uri, round.clipLimitMs, () => undefined); } catch (failure) { recover(failure); } finally { isPlayingRef.current = false; setIsPlaying(false); } };
   const update = (next: Round) => { onRoundChange?.(next); if (next.status !== 'playing') onRoundComplete?.(next); };
   const skip = async () => { setError(null); try { await player.pause(); const next = skipAttempt(round); if (next.status === 'playing') setSelectedGuess(null); update(next); } catch (failure) { recover(failure); } };
   const skipSong = async () => { if (isCompletingRef.current) return; isCompletingRef.current = true; setIsCompleting(true); setError(null); try { await player.pause(); update(giveUp(round)); } catch (failure) { isCompletingRef.current = false; setIsCompleting(false); recover(failure); } };
@@ -33,7 +35,7 @@ export function GameScreen({ round, searchTracks, player, onRoundChange, onRound
         <TrackSearch key={round.attemptIndex} disabled={disabled} onClear={() => setSelectedGuess(null)} onSelect={setSelectedGuess} search={searchTracks} />
         <button type="submit" disabled={disabled || !selectedGuess}>Submit guess</button>
       </form>
-      <button type="button" disabled={disabled} onClick={() => void play()} aria-label={`Play ${seconds} second clip`}>Play {seconds} second clip</button>
+      <button type="button" disabled={disabled || isPlaying} onClick={() => void play()} aria-label={`Play ${seconds} second clip`}>Play {seconds} second clip</button>
       <button type="button" disabled={disabled} onClick={() => void skip()}>Skip +1s</button>
       <button type="button" disabled={disabled} onClick={() => void skipSong()}>Skip song</button>
     </main>

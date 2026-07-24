@@ -76,7 +76,9 @@ export function getAccessToken(signal?: AbortSignal, forceRefresh = false): Prom
 
   if (!tokenRequest) {
     const tokenUrl = forceRefresh ? '/api/token?force=1' : '/api/token';
-    tokenRequest = requestJson<TokenResult>(tokenUrl, { signal })
+    // Deliberately no `signal` here: this promise is shared across every concurrent
+    // caller, so it must not be cancellable by whichever caller happens to start it.
+    tokenRequest = requestJson<TokenResult>(tokenUrl)
       .then((token) => {
         cachedToken = token;
         return token;

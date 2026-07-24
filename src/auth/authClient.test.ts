@@ -73,7 +73,22 @@ describe('authClient', () => {
 
     await getAccessToken(undefined, true);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/token?force=1', expect.objectContaining({ signal: undefined }));
+    expect(fetchMock).toHaveBeenCalledWith('/api/token?force=1', expect.anything());
+  });
+
+  it('does not let one caller abort the shared token request for other callers', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {
+      accessToken: 'token',
+      expiresAt: Date.now() + 3_600_000,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+
+    const pending = getAccessToken(controller.signal);
+    controller.abort();
+
+    await expect(pending).resolves.toMatchObject({ accessToken: 'token' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('preserves the reconnect URL when a forced refresh requires login', async () => {

@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import mascotUrl from '../assets/mascot.png';
-import { AppError, getAuthStatus, loginUrl } from '../auth/authClient';
+import { AppError, getAuthStatus, logout, loginUrl } from '../auth/authClient';
 import { GameScreen } from '../components/GameScreen';
 import { LoginScreen } from '../components/LoginScreen';
 import { ConfigurationScreen } from '../components/ConfigurationScreen';
@@ -26,14 +26,17 @@ type ResumeContext =
   | { type: 'play-clip'; source: SourceDescriptor; tracks: Track[]; round: Round }
   | { type: 'full-track'; source: SourceDescriptor; tracks: Track[]; round: Round; outcome: 'won' | 'lost' };
 
-function AppHeader({ onChangeSource }: { onChangeSource(): void }) {
+function AppHeader({ onChangeSource, onLogout }: { onChangeSource(): void; onLogout(): void }) {
   return (
     <header className="app-header">
       <button type="button" className="app-header__brand" onClick={onChangeSource}>
         <img src={mascotUrl} alt="" />
         <span>Heardle</span>
       </button>
-      <button type="button" onClick={onChangeSource}>Change source</button>
+      <div className="app-header__actions">
+        <button type="button" onClick={onChangeSource}>Change source</button>
+        <button type="button" onClick={onLogout}>Log out</button>
+      </div>
     </header>
   );
 }
@@ -199,6 +202,23 @@ export function App() {
     dispatch({ type: 'chooseSource' });
   }
 
+  async function handleLogout() {
+    if (!window.confirm('Log out of Spotify?')) return;
+    catalogController.current?.abort();
+    await player.current?.pause().catch(() => undefined);
+    player.current?.destroy();
+    player.current = null;
+    resumeContext.current = null;
+    setRound(null);
+    try {
+      await logout();
+      const status = await getAuthStatus();
+      dispatch({ type: 'authChecked', status });
+    } catch (error) {
+      dispatch({ type: 'failed', error: error as AppError });
+    }
+  }
+
   async function recoverPlayback(error: unknown) {
     await recoverWithResume(
       error,
@@ -231,7 +251,7 @@ export function App() {
   if (state.phase === 'choosing-source') {
     return (
       <main className="app-shell app-shell--picker">
-        <SourcePicker onSelect={selectSource} />
+        <SourcePicker onSelect={selectSource} onLogout={() => void handleLogout()} />
       </main>
     );
   }
@@ -273,7 +293,7 @@ export function App() {
 
     return (
       <>
-        <AppHeader onChangeSource={() => void changeSource()} />
+        <AppHeader onChangeSource={() => void changeSource()} onLogout={() => void handleLogout()} />
         <GameScreen
           round={round}
           tracks={state.tracks}
@@ -305,7 +325,7 @@ export function App() {
 
     return (
       <>
-        <AppHeader onChangeSource={() => void changeSource()} />
+        <AppHeader onChangeSource={() => void changeSource()} onLogout={() => void handleLogout()} />
         <main className="game-screen">
           <ResultView
             outcome={outcome}

@@ -65,6 +65,7 @@ main { padding-block: 1.5rem 3rem; }
   border-bottom: 1px solid var(--border);
 }
 .app-header__brand { display: flex; align-items: center; gap: .6rem; }
+.app-header__actions { display: flex; align-items: center; gap: .6rem; }
 .app-header__brand img { width: 30px; height: 30px; border-radius: 8px; object-fit: contain; flex: 0 0 auto; }
 button.app-header__brand {
   border: none;

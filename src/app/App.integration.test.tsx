@@ -8,6 +8,7 @@ import { App } from './App';
 
 const mocks = vi.hoisted(() => ({
   getAuthStatus: vi.fn(),
+  logout: vi.fn(),
   validateSpotifyAccount: vi.fn(),
   loadCatalog: vi.fn(),
   searchTracks: vi.fn(),
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../auth/authClient', async (importOriginal) => ({
   ...await importOriginal<typeof import('../auth/authClient')>(),
   getAuthStatus: mocks.getAuthStatus,
+  logout: mocks.logout,
 }));
 vi.mock('../spotify/account', () => ({
   validateSpotifyAccount: mocks.validateSpotifyAccount,
@@ -92,6 +94,7 @@ describe('App game workflow', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.getAuthStatus.mockResolvedValue(authStatus);
+    mocks.logout.mockResolvedValue(undefined);
     mocks.validateSpotifyAccount.mockResolvedValue(undefined);
     mocks.loadRecentTrackIds.mockReturnValue([]);
     mocks.sourceKey.mockReturnValue('top');
@@ -348,6 +351,54 @@ describe('App game workflow', () => {
 
     expect(await screen.findByRole('dialog')).toBeVisible();
     expect(mocks.player.pause).toHaveBeenCalled();
+  });
+
+  it('logs out after confirmation and returns to login', async () => {
+    mocks.loadCatalog.mockResolvedValue({ tracks, exclusions: { duplicates: 0, unavailable: 0, unsupported: 0 } });
+    mocks.getAuthStatus.mockResolvedValueOnce(authStatus).mockResolvedValueOnce({ ...authStatus, authenticated: false });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await chooseTopTracks();
+    await screen.findByRole('button', { name: 'Play 0.5 second clip' });
+
+    await user.click(screen.getByRole('button', { name: 'Log out' }));
+
+    expect(confirmSpy).toHaveBeenCalledWith('Log out of Spotify?');
+    expect(mocks.logout).toHaveBeenCalledOnce();
+    expect(mocks.player.destroy).toHaveBeenCalledOnce();
+    expect(await screen.findByRole('link', { name: 'Connect Spotify' })).toBeVisible();
+  });
+
+  it('does not log out when the confirmation is dismissed', async () => {
+    mocks.loadCatalog.mockResolvedValue({ tracks, exclusions: { duplicates: 0, unavailable: 0, unsupported: 0 } });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await chooseTopTracks();
+    await screen.findByRole('button', { name: 'Play 0.5 second clip' });
+
+    await user.click(screen.getByRole('button', { name: 'Log out' }));
+
+    expect(confirmSpy).toHaveBeenCalledWith('Log out of Spotify?');
+    expect(mocks.logout).not.toHaveBeenCalled();
+    expect(mocks.player.destroy).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: 'Play 0.5 second clip' })).toBeVisible();
+  });
+
+  it('offers a Log out button from the source picker before choosing a source', async () => {
+    mocks.getAuthStatus.mockResolvedValueOnce(authStatus).mockResolvedValueOnce({ ...authStatus, authenticated: false });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Log out' }));
+
+    expect(confirmSpy).toHaveBeenCalledWith('Log out of Spotify?');
+    expect(mocks.logout).toHaveBeenCalledOnce();
+    expect(await screen.findByRole('link', { name: 'Connect Spotify' })).toBeVisible();
   });
 
   it('persists a winning streak and pauses before starting another round from results', async () => {

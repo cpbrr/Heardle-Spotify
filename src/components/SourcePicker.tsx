@@ -13,6 +13,7 @@ type SearchableKind = Exclude<SourceDescriptor['kind'], 'top' | 'liked'>;
 interface SourcePickerProps {
   onSelect(source: SourceDescriptor): void;
   onClose?: () => void;
+  onLogout?: () => void;
   search?: (kind: SearchableKind, query: string, signal: AbortSignal) => Promise<SourceDescriptor[]>;
 }
 
@@ -59,7 +60,7 @@ function searchLabel(kind: SearchableKind) {
   return 'Search tracks';
 }
 
-export function SourcePicker({ onSelect, onClose, search = searchSources }: SourcePickerProps) {
+export function SourcePicker({ onSelect, onClose, onLogout, search = searchSources }: SourcePickerProps) {
   const [activeKind, setActiveKind] = useState<SearchableKind | null>(null);
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -113,11 +114,14 @@ export function SourcePicker({ onSelect, onClose, search = searchSources }: Sour
           <img src={mascotUrl} alt="" />
           <span>Heardle</span>
         </div>
-        {onClose ? (
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close source picker" title="Close source picker">
-            <X aria-hidden="true" />
-          </button>
-        ) : null}
+        <div className="app-header__actions">
+          {onLogout ? <button type="button" onClick={onLogout}>Log out</button> : null}
+          {onClose ? (
+            <button type="button" className="icon-button" onClick={onClose} aria-label="Close source picker" title="Close source picker">
+              <X aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {!activeKind ? (

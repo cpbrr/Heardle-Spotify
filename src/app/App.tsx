@@ -7,12 +7,12 @@ import { ConfigurationScreen } from '../components/ConfigurationScreen';
 import { ResultView } from '../components/ResultView';
 import { SourcePicker } from '../components/SourcePicker';
 import { StatusMessage } from '../components/StatusMessage';
-import { createRound, selectRoundTrack, type Round } from '../game/gameEngine';
+import { completeRound, createRound, selectRoundTrack, type Round } from '../game/gameEngine';
 import { SpotifyPlayer } from '../player/SpotifyPlayer';
 import { loadCatalog } from '../sources/catalog';
 import { loadRecentTrackIds, loadStreak, saveRecentTrackIds, saveSource, saveStreak, sourceKey } from '../sources/sourceStorage';
 import { validateSpotifyAccount } from '../spotify/account';
-import type { SourceDescriptor, Track } from '../spotify/types';
+import type { ResumeAction, SourceDescriptor, Track } from '../spotify/types';
 import { appReducer, initialAppState } from './appReducer';
 
 function isAuthenticationError(error: unknown) {
@@ -25,7 +25,15 @@ type ResumeContext =
   | { type: 'full-track'; source: SourceDescriptor; tracks: Track[]; round: Round; outcome: 'won' | 'lost' };
 
 function AppHeader({ onChangeSource }: { onChangeSource(): void }) {
-  return <header className="app-header"><span>Heardle</span><button type="button" onClick={onChangeSource}>Change source</button></header>;
+  return (
+    <header className="app-header">
+      <div className="app-header__brand">
+        <img src="/mascot.png" alt="" />
+        <span>Heardle</span>
+      </div>
+      <button type="button" onClick={onChangeSource}>Change source</button>
+    </header>
+  );
 }
 
 export function App() {
@@ -145,16 +153,23 @@ export function App() {
     setRound(preparedRound);
     void player.current?.connect()
       .then(() => dispatch({ type: 'playerReady' }))
-      .catch(async (error: unknown) => {
-        if (isAuthenticationError(error)) {
-          const status = await getAuthStatus();
-          resumeContext.current = { type: 'play-clip', source: state.source, tracks: state.tracks, round: preparedRound };
-          dispatch({ type: 'authExpired', status, resumeAction: { type: 'play' } });
-        } else {
-          dispatch({ type: 'failed', error: error as AppError });
-        }
-      });
+      .catch((error: unknown) => recoverWithResume(
+        error,
+        () => ({ type: 'play-clip', source: state.source, tracks: state.tracks, round: preparedRound }),
+        { type: 'play' },
+      ));
   }, [state]);
+
+  async function recoverWithResume(error: unknown, buildResumeContext: () => ResumeContext | null, resumeAction: ResumeAction) {
+    if (!isAuthenticationError(error)) {
+      dispatch({ type: 'failed', error: error as AppError });
+      return;
+    }
+    const status = await getAuthStatus();
+    const context = buildResumeContext();
+    if (context) resumeContext.current = context;
+    dispatch({ type: 'authExpired', status, resumeAction });
+  }
 
   function selectSource(source: SourceDescriptor) {
     setRound(null);
@@ -170,64 +185,124 @@ export function App() {
   }
 
   async function recoverPlayback(error: unknown) {
-    if (!isAuthenticationError(error)) {
-      dispatch({ type: 'failed', error: error as AppError });
-      return;
-    }
-    const status = await getAuthStatus();
-    if ((state.phase === 'ready' || state.phase === 'playing') && round) resumeContext.current = { type: 'play-clip', source: state.source, tracks: state.tracks, round };
-    dispatch({ type: 'authExpired', status, resumeAction: { type: 'play' } });
+    await recoverWithResume(
+      error,
+      () => (((state.phase === 'ready' || state.phase === 'playing') && round)
+        ? { type: 'play-clip', source: state.source, tracks: state.tracks, round }
+        : null),
+      { type: 'play' },
+    );
   }
 
   function nextRound(source: SourceDescriptor, catalog: Track[]) {
     const key = sourceKey(source);
-    const answer = selectRoundTrack(catalog, loadRecentTrackIds(key));
-    saveRecentTrackIds(key, [...loadRecentTrackIds(key), answer.id]);
+    const recentTrackIds = loadRecentTrackIds(key);
+    const answer = selectRoundTrack(catalog, recentTrackIds);
+    saveRecentTrackIds(key, [...recentTrackIds, answer.id]);
     return createRound(answer);
   }
 
   async function recoverResultPlayback(error: unknown, source: SourceDescriptor, tracks: Track[], completedRound: Round, outcome: 'won' | 'lost') {
-    if (!isAuthenticationError(error)) {
-      dispatch({ type: 'failed', error: error as AppError });
-      return;
-    }
-    const status = await getAuthStatus();
-    resumeContext.current = { type: 'full-track', source, tracks, round: completedRound, outcome };
-    dispatch({ type: 'authExpired', status, resumeAction: { type: 'play' } });
+    await recoverWithResume(
+      error,
+      () => ({ type: 'full-track', source, tracks, round: completedRound, outcome }),
+      { type: 'play' },
+    );
   }
 
   if (state.phase === 'needs-configuration') return <ConfigurationScreen status={state.status} />;
   if (state.phase === 'needs-login') return <LoginScreen />;
+
   if (state.phase === 'choosing-source') {
-    return <main className="app-shell app-shell--picker"><SourcePicker onSelect={selectSource} /></main>;
+    return (
+      <main className="app-shell app-shell--picker">
+        <SourcePicker onSelect={selectSource} />
+      </main>
+    );
   }
+
   if (state.phase === 'loading-catalog') {
-    return <main className="loading-screen"><p className="wordmark">Heardle</p><StatusMessage>Loading {state.source.name}...</StatusMessage><button type="button" onClick={() => void changeSource()}>Change source</button></main>;
+    return (
+      <main className="loading-screen">
+        <p className="wordmark">Heardle</p>
+        <StatusMessage>Loading {state.source.name}...</StatusMessage>
+        <button type="button" onClick={() => void changeSource()}>Change source</button>
+      </main>
+    );
   }
+
   if (state.phase === 'error') {
     const reconnectUrl = state.error.loginUrl || (state.error.code === 'spotify_account_not_allowed' ? loginUrl : undefined);
-    return <main className="setup-screen"><p className="wordmark">Heardle</p><StatusMessage tone="error">{state.error.message}</StatusMessage>{reconnectUrl ? <a className="button button--primary" href={reconnectUrl}>Connect Spotify</a> : null}</main>;
+    return (
+      <main className="setup-screen">
+        <p className="wordmark">Heardle</p>
+        <StatusMessage tone="error">{state.error.message}</StatusMessage>
+        {reconnectUrl ? <a className="button button--primary" href={reconnectUrl}>Connect Spotify</a> : null}
+      </main>
+    );
   }
+
   if ((state.phase === 'ready' || state.phase === 'playing') && round && player.current) {
-    return <><AppHeader onChangeSource={() => void changeSource()} /><GameScreen round={round} tracks={state.tracks} player={player.current} onRoundChange={setRound} onRoundComplete={(completed) => {
-      const nextStreak = completed.status === 'won' ? streak + 1 : 0;
+    const handleRoundComplete = (completed: Round) => {
+      const { streak: nextStreak } = completeRound(completed, streak);
       setStreak(nextStreak);
       saveStreak(nextStreak);
       dispatch({ type: 'roundCompleted', outcome: completed.status === 'won' ? 'won' : 'lost' });
-    }} onAuthExpired={(error) => void recoverPlayback(error)} /></>;
+    };
+
+    return (
+      <>
+        <AppHeader onChangeSource={() => void changeSource()} />
+        <GameScreen
+          round={round}
+          tracks={state.tracks}
+          player={player.current}
+          onRoundChange={setRound}
+          onRoundComplete={handleRoundComplete}
+          onAuthExpired={(error) => void recoverPlayback(error)}
+        />
+      </>
+    );
   }
+
   if (state.phase === 'round-complete' && round && player.current) {
-    return <><AppHeader onChangeSource={() => void changeSource()} /><main className="game-screen"><ResultView outcome={state.outcome} title={round.answer.title} artist={round.answer.artistText} imageUrl={round.answer.imageUrl} onPlayFullTrack={() => void (async () => {
+    const { source, tracks, outcome } = state;
+
+    const playFullTrackFromResult = async () => {
       try {
         await player.current?.playFullTrack(round.answer.uri);
       } catch (error) {
-        await recoverResultPlayback(error, state.source, state.tracks, round, state.outcome);
+        await recoverResultPlayback(error, source, tracks, round, outcome);
       }
-    })()} onPlayAnother={() => void (async () => {
+    };
+
+    const playAnotherRound = async () => {
       await player.current?.pause().catch(() => undefined);
-      setRound(nextRound(state.source, state.tracks));
+      setRound(nextRound(source, tracks));
       dispatch({ type: 'roundRestarted' });
-    })()} /></main></>;
+    };
+
+    return (
+      <>
+        <AppHeader onChangeSource={() => void changeSource()} />
+        <main className="game-screen">
+          <ResultView
+            outcome={outcome}
+            title={round.answer.title}
+            artist={round.answer.artistText}
+            imageUrl={round.answer.imageUrl}
+            onPlayFullTrack={() => void playFullTrackFromResult()}
+            onPlayAnother={() => void playAnotherRound()}
+          />
+        </main>
+      </>
+    );
   }
-  return <main className="loading-screen"><h1>Heardle</h1><p>Checking Spotify connection...</p></main>;
+
+  return (
+    <main className="loading-screen">
+      <h1>Heardle</h1>
+      <p>Checking Spotify connection...</p>
+    </main>
+  );
 }

@@ -1,8 +1,8 @@
-import { Search } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { Search, X } from 'lucide-react';
+import { useId, useState } from 'react';
 import type React from 'react';
 
-import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useSearchCombobox } from '../hooks/useSearchCombobox';
 import { searchTracks } from '../sources/catalog';
 import type { Track } from '../spotify/types';
 import { StatusMessage } from './StatusMessage';
@@ -16,8 +16,6 @@ export interface TrackSearchProps {
   search?: TrackSearchFunction;
 }
 
-type SearchState = 'idle' | 'loading' | 'ready' | 'error';
-
 export function TrackSearch({
   disabled = false,
   onClear,
@@ -25,89 +23,32 @@ export function TrackSearch({
   search = searchTracks,
 }: TrackSearchProps): React.JSX.Element {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Track[]>([]);
-  const [state, setState] = useState<SearchState>('idle');
-  const [error, setError] = useState('');
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const [retryNonce, setRetryNonce] = useState(0);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
-  const activeRequest = useRef<AbortController | null>(null);
-  const debouncedQuery = useDebouncedValue(query, 250);
   const listboxId = useId();
 
-  useEffect(() => {
-    const normalizedQuery = debouncedQuery.trim();
-    if (disabled || normalizedQuery.length < 2) {
-      setResults([]);
-      setState('idle');
-      setError('');
-      setActiveIndex(-1);
-      return;
-    }
-
-    activeRequest.current?.abort();
-    const controller = new AbortController();
-    activeRequest.current = controller;
-    setState('loading');
-    setError('');
-    setActiveIndex(-1);
-    void search(normalizedQuery, controller.signal)
-      .then((tracks) => {
-        if (controller.signal.aborted) return;
-        setResults(tracks);
-        setState('ready');
-      })
-      .catch((searchError: unknown) => {
-        if (controller.signal.aborted) return;
-        setResults([]);
-        setError(searchError instanceof Error ? searchError.message : 'Search unavailable');
-        setState('error');
-      });
-
-    return () => {
-      controller.abort();
-      if (activeRequest.current === controller) activeRequest.current = null;
-    };
-  }, [debouncedQuery, disabled, retryNonce, search]);
+  const { results, state, error, activeIndex, setActiveIndex, reset, retry, handleKeyDown } = useSearchCombobox<Track>({
+    query,
+    enabled: !disabled,
+    search,
+  });
 
   function selectTrack(track: Track) {
     setSelectedTrack(track);
     onSelect(track);
   }
 
+  function clearSelection() {
+    if (!selectedTrack) return;
+    setSelectedTrack(null);
+    onClear?.();
+  }
+
   function changeQuery(nextQuery: string) {
-    activeRequest.current?.abort();
-    activeRequest.current = null;
     setQuery(nextQuery);
-    setResults([]);
-    setState('idle');
-    setError('');
-    setActiveIndex(-1);
+    reset();
     if (selectedTrack) {
       setSelectedTrack(null);
       onClear?.();
-    }
-  }
-
-  function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'ArrowDown' && results.length > 0) {
-      event.preventDefault();
-      setActiveIndex((current) => (current + 1) % results.length);
-      return;
-    }
-    if (event.key === 'ArrowUp' && results.length > 0) {
-      event.preventDefault();
-      setActiveIndex((current) => (current <= 0 ? results.length - 1 : current - 1));
-      return;
-    }
-    if (event.key === 'Enter' && activeIndex >= 0) {
-      event.preventDefault();
-      selectTrack(results[activeIndex]);
-      return;
-    }
-    if (event.key === 'Escape') {
-      setResults([]);
-      setActiveIndex(-1);
     }
   }
 
@@ -129,7 +70,7 @@ export function TrackSearch({
           placeholder="Search Spotify for your guess"
           value={query}
           onChange={(event) => changeQuery(event.target.value)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(event) => handleKeyDown(event, (index) => selectTrack(results[index]))}
         />
       </label>
 
@@ -141,7 +82,7 @@ export function TrackSearch({
             type="button"
             className="button button--secondary"
             disabled={disabled}
-            onClick={() => setRetryNonce((value) => value + 1)}
+            onClick={retry}
           >
             Retry search
           </button>
@@ -184,9 +125,20 @@ export function TrackSearch({
 
       {selectedTrack ? (
         <div className="track-search__selection" aria-live="polite">
-          <span className="eyebrow">Selected guess</span>
-          <strong>{selectedTrack.title}</strong>
-          <span className="muted">{selectedTrack.artistText}</span>
+          <div>
+            <span className="eyebrow">Selected guess</span>
+            <strong>{selectedTrack.title}</strong>
+            <span className="muted">{selectedTrack.artistText}</span>
+          </div>
+          <button
+            type="button"
+            className="icon-button track-search__selection-clear"
+            onClick={clearSelection}
+            aria-label="Clear selected guess"
+            title="Clear selected guess"
+          >
+            <X aria-hidden="true" size={16} />
+          </button>
         </div>
       ) : null}
     </section>

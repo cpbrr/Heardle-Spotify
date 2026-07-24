@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Search, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Disc3, Heart, Library, ListMusic, Music, Search, TrendingUp, Users, X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
-import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useSearchCombobox } from '../hooks/useSearchCombobox';
 import { searchSources } from '../sources/catalog';
 import type { SourceDescriptor } from '../spotify/types';
 import { StatusMessage } from './StatusMessage';
@@ -14,8 +15,23 @@ interface SourcePickerProps {
   search?: (kind: SearchableKind, query: string, signal: AbortSignal) => Promise<SourceDescriptor[]>;
 }
 
+const SOURCE_ICONS: Record<SourceDescriptor['kind'], LucideIcon> = {
+  'artist-mix': Users,
+  'artist-discography': Library,
+  playlist: ListMusic,
+  album: Disc3,
+  track: Music,
+  top: TrendingUp,
+  liked: Heart,
+};
+
+const QUICK_PICKS: Array<{ kind: 'top' | 'liked'; label: string }> = [
+  { kind: 'top', label: 'My top tracks' },
+  { kind: 'liked', label: 'My liked songs' },
+];
+
 const SOURCE_OPTIONS: Array<{
-  kind: SourceDescriptor['kind'];
+  kind: SearchableKind;
   label: string;
   description: string;
 }> = [
@@ -24,8 +40,6 @@ const SOURCE_OPTIONS: Array<{
   { kind: 'playlist', label: 'Playlist', description: 'Choose one of Spotify’s public or saved playlists' },
   { kind: 'album', label: 'Album', description: 'Play from one release' },
   { kind: 'track', label: 'Specific track', description: 'Start a round with one exact song' },
-  { kind: 'top', label: 'My top tracks', description: 'Your current Spotify favourites' },
-  { kind: 'liked', label: 'My liked songs', description: 'A mix from your saved library' },
 ];
 
 const IMMEDIATE_SOURCES: Record<'top' | 'liked', SourceDescriptor> = {
@@ -47,41 +61,26 @@ function searchLabel(kind: SearchableKind) {
 export function SourcePicker({ onSelect, onClose, search = searchSources }: SourcePickerProps) {
   const [activeKind, setActiveKind] = useState<SearchableKind | null>(null);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SourceDescriptor[]>([]);
-  const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  const [error, setError] = useState('');
-  const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [retryNonce, setRetryNonce] = useState(0);
-  const debouncedQuery = useDebouncedValue(query, 250);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!activeKind || debouncedQuery.trim().length < 2) {
-      setResults([]);
-      setState('idle');
-      return;
-    }
-
-    const controller = new AbortController();
-    setState('loading');
-    setResults([]);
-    setError('');
-    setSelectedIndex(-1);
-    void search(activeKind, debouncedQuery.trim(), controller.signal)
-      .then((items) => {
-        if (!controller.signal.aborted) {
-          setResults(items);
-          setState('ready');
-        }
-      })
-      .catch((searchError: unknown) => {
-        if (!controller.signal.aborted) {
-          setError(searchError instanceof Error ? searchError.message : 'Search unavailable');
-          setState('error');
-        }
-      });
-    return () => controller.abort();
-  }, [activeKind, debouncedQuery, retryNonce, search]);
+  const searchByKind = useCallback(
+    (normalizedQuery: string, signal: AbortSignal) => search(activeKind as SearchableKind, normalizedQuery, signal),
+    [activeKind, search],
+  );
+  const {
+    results,
+    state,
+    error,
+    activeIndex: selectedIndex,
+    setActiveIndex: setSelectedIndex,
+    reset,
+    retry,
+    handleKeyDown,
+  } = useSearchCombobox<SourceDescriptor>({
+    query,
+    enabled: activeKind !== null,
+    search: searchByKind,
+  });
 
   useEffect(() => {
     if (activeKind) inputRef.current?.focus();
@@ -99,24 +98,11 @@ export function SourcePicker({ onSelect, onClose, search = searchSources }: Sour
     }
     setActiveKind(kind);
     setQuery('');
-    setResults([]);
-    setState('idle');
+    reset();
   }
 
   function handleInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'ArrowDown' && results.length) {
-      event.preventDefault();
-      setSelectedIndex((current) => (current + 1) % results.length);
-    } else if (event.key === 'ArrowUp' && results.length) {
-      event.preventDefault();
-      setSelectedIndex((current) => (current <= 0 ? results.length - 1 : current - 1));
-    } else if (event.key === 'Enter' && selectedIndex >= 0) {
-      event.preventDefault();
-      onSelect(results[selectedIndex]);
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      setActiveKind(null);
-    }
+    handleKeyDown(event, (index) => onSelect(results[index]), () => setActiveKind(null));
   }
 
   return (
@@ -139,13 +125,35 @@ export function SourcePicker({ onSelect, onClose, search = searchSources }: Sour
       </header>
 
       {!activeKind ? (
-        <div className="source-list">
-          {SOURCE_OPTIONS.map((option) => (
-            <button type="button" className="source-row" key={option.kind} onClick={() => chooseMode(option.kind)}>
-              <span>{option.label}</span>
-              <small>{option.description}</small>
-            </button>
-          ))}
+        <div className="source-home">
+          <div className="source-quick-picks">
+            {QUICK_PICKS.map((option) => {
+              const Icon = SOURCE_ICONS[option.kind];
+              return (
+                <button type="button" className="source-quick-pick" key={option.kind} onClick={() => chooseMode(option.kind)}>
+                  <span className="source-quick-pick__icon" aria-hidden="true"><Icon size={18} /></span>
+                  <span className="source-quick-pick__label">{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div>
+            <span className="source-grid-label">Browse a source</span>
+            <div className="source-grid">
+              {SOURCE_OPTIONS.map((option) => {
+                const Icon = SOURCE_ICONS[option.kind];
+                return (
+                  <button type="button" className="source-card" key={option.kind} onClick={() => chooseMode(option.kind)}>
+                    <span className="source-card__badge" aria-hidden="true"><Search size={11} />Search</span>
+                    <span className="source-card__icon" aria-hidden="true"><Icon size={26} /></span>
+                    <span className="source-card__title">{option.label}</span>
+                    <span className="source-card__description">{option.description}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="source-search">
@@ -170,7 +178,7 @@ export function SourcePicker({ onSelect, onClose, search = searchSources }: Sour
           {state === 'error' && (
             <div>
               <StatusMessage tone="error">{error}</StatusMessage>
-              <button type="button" className="button button--secondary" onClick={() => setRetryNonce((value) => value + 1)}>Retry search</button>
+              <button type="button" className="button button--secondary" onClick={retry}>Retry search</button>
             </div>
           )}
           {state === 'ready' && results.length === 0 && <StatusMessage>No matching sources found.</StatusMessage>}

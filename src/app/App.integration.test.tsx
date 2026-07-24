@@ -80,7 +80,10 @@ async function chooseLikedSongs() {
   await userEvent.click(await screen.findByRole('button', { name: /My liked songs/ }));
 }
 async function chooseGuess(track: Track) {
-  await userEvent.type(screen.getByRole('combobox', { name: 'Guess' }), track.title);
+  // The GameScreen combobox only exists once the source-select -> loading-catalog ->
+  // preparing-player -> ready chain fully settles; find (poll) rather than get so this
+  // doesn't race that multi-hop async chain when called right after chooseTopTracks().
+  await userEvent.type(await screen.findByRole('combobox', { name: 'Guess' }), track.title);
   await userEvent.click(await screen.findByRole('option', { name: new RegExp(track.title, 'i') }));
 }
 

@@ -314,6 +314,9 @@ export function App() {
             onPlayFullTrack={() => void playFullTrackFromResult()}
             onPlayAnother={() => void playAnotherRound()}
           />
+          <div className="result-mascot" aria-hidden="true">
+            <img src="/mascot.png" alt="" />
+          </div>
         </main>
       </>
     );
